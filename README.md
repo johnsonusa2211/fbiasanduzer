@@ -1,0 +1,1 @@
+# forex-bias-analyzer
