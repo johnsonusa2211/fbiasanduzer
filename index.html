@@ -56,9 +56,17 @@
         .storage-dot.cloud { background: #22c55e; }
         .storage-dot.local { background: #f59e0b; }
         .storage-dot.offline { background: #ef4444; }
+        .storage-dot.syncing { 
+            background: #3b82f6; 
+            animation: spin 1s linear infinite;
+        }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         /* Expanded Storage Panel */
@@ -556,13 +564,25 @@
                         </div>
                     </div>
                     
-                    <div class="grid grid-2" style="gap: 8px; margin-bottom: 12px;">
-                        <button class="btn btn-sm btn-green" onclick="syncToGDrive()">⬆️ Upload</button>
-                        <button class="btn btn-sm btn-primary" onclick="syncFromGDrive()">⬇️ Download</button>
+                    <!-- Auto-Sync Status -->
+                    <div style="background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); border-radius: 8px; padding: 10px; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 16px;">🔄</span>
+                                <span style="font-size: 12px; font-weight: 600;">Auto-Sync Enabled</span>
+                            </div>
+                            <div style="font-size: 10px; opacity: 0.8;">Syncs after every save</div>
+                        </div>
                     </div>
                     
-                    <div style="font-size: 11px; opacity: 0.8; margin-bottom: 12px;">
-                        Last sync: <span id="gdriveLastSync">Never</span>
+                    <div class="grid grid-2" style="gap: 8px; margin-bottom: 12px;">
+                        <button class="btn btn-sm btn-green" onclick="syncToGDrive()">⬆️ Upload All</button>
+                        <button class="btn btn-sm btn-primary" onclick="syncFromGDrive()">⬇️ Download & Merge</button>
+                    </div>
+                    
+                    <div style="font-size: 11px; opacity: 0.8; margin-bottom: 12px; display: flex; justify-content: space-between;">
+                        <span>Last sync: <span id="gdriveLastSync">Never</span></span>
+                        <span id="gdriveFileStatus" style="color: #4ade80;">✓ Connected</span>
                     </div>
                     
                     <button class="btn btn-sm" style="width: 100%; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);" onclick="handleGoogleSignOut()">
@@ -1044,9 +1064,15 @@
             // Load last sync time
             var lastSync = localStorage.getItem('gdrive_last_sync');
             if (lastSync) {
+                gdriveState.lastSyncTime = lastSync;
                 var el = document.getElementById('gdriveLastSync');
                 if (el) el.textContent = lastSync;
             }
+            
+            // Restore Google Drive session if we have a valid token
+            setTimeout(function() {
+                restoreGDriveSession();
+            }, 500); // Small delay to let UI render first
             
             document.getElementById('tradeDate').value = new Date().toISOString().split('T')[0];
         }
@@ -1195,6 +1221,12 @@
             var data = JSON.stringify(state.history);
             localStorage.setItem('bias_' + state.pair, data);
             addSyncLog('✅ Saved to LOCAL storage', 'success');
+            
+            // Auto-sync to Google Drive if connected
+            if (gdriveState.accessToken && gdriveState.autoSync && !gdriveState.syncing) {
+                autoSyncToGDrive();
+                return; // Toast will be shown by autoSync
+            }
             
             if (state.cloudAvailable && navigator.onLine) {
                 window.storage.set('bias_' + state.pair, data).then(function() {
@@ -1978,10 +2010,14 @@
         // ============ GOOGLE DRIVE INTEGRATION ============
         var gdriveState = {
             clientId: localStorage.getItem('gdrive_client_id') || '',
-            accessToken: null,
-            user: null,
-            fileId: null,  // Store the file ID for updates
-            initialized: false
+            accessToken: localStorage.getItem('gdrive_access_token') || null,
+            tokenExpiry: parseInt(localStorage.getItem('gdrive_token_expiry') || '0'),
+            user: JSON.parse(localStorage.getItem('gdrive_user') || 'null'),
+            fileId: localStorage.getItem('gdrive_file_id') || null,
+            initialized: false,
+            autoSync: true,  // Enable auto-sync by default
+            syncing: false,  // Prevent multiple syncs at once
+            lastSyncTime: localStorage.getItem('gdrive_last_sync') || null
         };
 
         // Load saved client ID on page load
@@ -2054,6 +2090,14 @@
             }
 
             gdriveState.accessToken = response.access_token;
+            // Calculate token expiry time (typically 1 hour)
+            var expiresIn = response.expires_in || 3600;
+            gdriveState.tokenExpiry = Date.now() + (expiresIn * 1000);
+            
+            // Persist to localStorage
+            localStorage.setItem('gdrive_access_token', response.access_token);
+            localStorage.setItem('gdrive_token_expiry', gdriveState.tokenExpiry.toString());
+            
             addSyncLog('Google auth successful', 'success');
             
             // Get user info
@@ -2063,12 +2107,16 @@
             .then(function(res) { return res.json(); })
             .then(function(user) {
                 gdriveState.user = user;
+                localStorage.setItem('gdrive_user', JSON.stringify(user));
                 updateGDriveUI(true);
                 addSyncLog('Signed in as ' + user.email, 'success');
                 showToast('✅ Connected to Google Drive');
                 
                 // Check if we have existing data file
-                findExistingFile();
+                findExistingFile().then(function() {
+                    // Auto-sync on sign in
+                    autoSyncOnLoad();
+                });
             })
             .catch(function(err) {
                 addSyncLog('Failed to get user info: ' + err, 'error');
@@ -2106,12 +2154,16 @@
         }
 
         // Update main storage badge for Google Drive
-        function updateStorageBadgeForGDrive(connected) {
+        function updateStorageBadgeForGDrive(connected, syncing) {
             var badge = document.getElementById('storageBadge');
             var dot = document.getElementById('storageDot');
             var text = document.getElementById('storageText');
             
-            if (connected) {
+            if (syncing) {
+                badge.className = 'storage-badge cloud';
+                dot.className = 'storage-dot cloud syncing';
+                text.textContent = '🔄 Syncing...';
+            } else if (connected) {
                 badge.className = 'storage-badge cloud';
                 dot.className = 'storage-dot cloud';
                 text.textContent = '☁️ Google Drive';
@@ -2120,21 +2172,71 @@
 
         // Find existing data file in Google Drive
         function findExistingFile() {
-            if (!gdriveState.accessToken) return;
+            if (!gdriveState.accessToken) return Promise.resolve();
             
-            fetch('https://www.googleapis.com/drive/v3/files?q=name%3D%27forex_bias_data.json%27&spaces=appDataFolder', {
+            return fetch('https://www.googleapis.com/drive/v3/files?q=name%3D%27forex_bias_data.json%27&spaces=drive', {
                 headers: { 'Authorization': 'Bearer ' + gdriveState.accessToken }
             })
             .then(function(res) { return res.json(); })
             .then(function(data) {
                 if (data.files && data.files.length > 0) {
                     gdriveState.fileId = data.files[0].id;
+                    localStorage.setItem('gdrive_file_id', gdriveState.fileId);
                     addSyncLog('Found existing data file in Drive', 'info');
                 }
             })
             .catch(function(err) {
                 addSyncLog('Error finding file: ' + err, 'error');
             });
+        }
+
+        // Restore Google Drive session on page load
+        function restoreGDriveSession() {
+            // Check if we have a saved token that's not expired
+            if (gdriveState.accessToken && gdriveState.tokenExpiry > Date.now()) {
+                addSyncLog('🔄 Restoring Google Drive session...', 'info');
+                
+                // Validate the token by trying to get user info
+                fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                    headers: { 'Authorization': 'Bearer ' + gdriveState.accessToken }
+                })
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Token invalid');
+                    return res.json();
+                })
+                .then(function(user) {
+                    gdriveState.user = user;
+                    localStorage.setItem('gdrive_user', JSON.stringify(user));
+                    updateGDriveUI(true);
+                    addSyncLog('✅ Session restored: ' + user.email, 'success');
+                    
+                    // Auto-sync on restore
+                    findExistingFile().then(function() {
+                        autoSyncOnLoad();
+                    });
+                })
+                .catch(function(err) {
+                    addSyncLog('Session expired, please sign in again', 'warning');
+                    clearGDriveSession();
+                });
+            } else if (gdriveState.accessToken) {
+                // Token expired
+                addSyncLog('Token expired, please sign in again', 'warning');
+                clearGDriveSession();
+            }
+        }
+
+        // Clear saved Google Drive session
+        function clearGDriveSession() {
+            gdriveState.accessToken = null;
+            gdriveState.tokenExpiry = 0;
+            gdriveState.user = null;
+            gdriveState.fileId = null;
+            localStorage.removeItem('gdrive_access_token');
+            localStorage.removeItem('gdrive_token_expiry');
+            localStorage.removeItem('gdrive_user');
+            localStorage.removeItem('gdrive_file_id');
+            updateGDriveUI(false);
         }
 
         // Upload data to Google Drive
@@ -2145,6 +2247,7 @@
             }
 
             addSyncLog('Uploading to Google Drive...', 'info');
+            gdriveState.syncing = true;
 
             // Gather all data
             var allData = {
@@ -2187,25 +2290,104 @@
             })
             .then(function(res) { return res.json(); })
             .then(function(data) {
+                gdriveState.syncing = false;
                 if (data.id) {
                     gdriveState.fileId = data.id;
                     var now = new Date().toLocaleTimeString();
+                    gdriveState.lastSyncTime = now;
                     document.getElementById('gdriveLastSync').textContent = now;
                     localStorage.setItem('gdrive_last_sync', now);
                     addSyncLog('✅ Uploaded to Google Drive', 'success');
-                    showToast('✅ Data uploaded to Google Drive');
+                    showToast('✅ Synced to Google Drive');
+                    updateStorageBadge();
                 } else {
                     addSyncLog('Upload failed: ' + JSON.stringify(data), 'error');
                     showToast('❌ Upload failed');
                 }
             })
             .catch(function(err) {
+                gdriveState.syncing = false;
                 addSyncLog('Upload error: ' + err, 'error');
                 showToast('❌ Upload failed');
             });
         }
 
-        // Download data from Google Drive
+        // Auto-sync to Google Drive (called after each save)
+        function autoSyncToGDrive() {
+            if (!gdriveState.accessToken || gdriveState.syncing) {
+                return;
+            }
+
+            gdriveState.syncing = true;
+            updateStorageBadgeForGDrive(true, true); // Show syncing status
+            addSyncLog('🔄 Auto-syncing to Google Drive...', 'info');
+
+            // Gather all data from both pairs
+            var allData = {
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                pairs: {}
+            };
+
+            ['GBPUSD', 'GBPJPY'].forEach(function(pair) {
+                var data = localStorage.getItem('bias_' + pair);
+                if (data) {
+                    allData.pairs[pair] = JSON.parse(data);
+                }
+            });
+
+            var fileContent = JSON.stringify(allData, null, 2);
+            var file = new Blob([fileContent], { type: 'application/json' });
+            var metadata = {
+                name: 'forex_bias_data.json',
+                mimeType: 'application/json'
+            };
+
+            var form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+            form.append('file', file);
+
+            var url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+            var method = 'POST';
+            
+            if (gdriveState.fileId) {
+                url = 'https://www.googleapis.com/upload/drive/v3/files/' + gdriveState.fileId + '?uploadType=multipart';
+                method = 'PATCH';
+            }
+
+            fetch(url, {
+                method: method,
+                headers: { 'Authorization': 'Bearer ' + gdriveState.accessToken },
+                body: form
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                gdriveState.syncing = false;
+                updateStorageBadgeForGDrive(true, false); // Remove syncing status
+                if (data.id) {
+                    gdriveState.fileId = data.id;
+                    localStorage.setItem('gdrive_file_id', data.id);
+                    var now = new Date().toLocaleTimeString();
+                    gdriveState.lastSyncTime = now;
+                    var el = document.getElementById('gdriveLastSync');
+                    if (el) el.textContent = now;
+                    localStorage.setItem('gdrive_last_sync', now);
+                    addSyncLog('✅ Auto-synced to Google Drive', 'success');
+                    showToast('✅ Saved & Synced to Drive');
+                } else {
+                    addSyncLog('Auto-sync failed: ' + (data.error ? data.error.message : 'Unknown error'), 'error');
+                    showToast('✅ Saved locally (sync failed)');
+                }
+            })
+            .catch(function(err) {
+                gdriveState.syncing = false;
+                updateStorageBadgeForGDrive(true, false);
+                addSyncLog('Auto-sync error: ' + err, 'error');
+                showToast('✅ Saved locally (sync failed)');
+            });
+        }
+
+        // Sync FROM Google Drive with smart merge
         function syncFromGDrive() {
             if (!gdriveState.accessToken) {
                 showToast('⚠️ Please sign in first');
@@ -2213,6 +2395,7 @@
             }
 
             addSyncLog('Downloading from Google Drive...', 'info');
+            gdriveState.syncing = true;
 
             // First find the file
             fetch('https://www.googleapis.com/drive/v3/files?q=name%3D%27forex_bias_data.json%27&spaces=drive', {
@@ -2221,9 +2404,10 @@
             .then(function(res) { return res.json(); })
             .then(function(data) {
                 if (!data.files || data.files.length === 0) {
+                    gdriveState.syncing = false;
                     addSyncLog('No data file found in Drive', 'warning');
                     showToast('⚠️ No backup found in Google Drive');
-                    return;
+                    return Promise.reject('No file found');
                 }
 
                 var fileId = data.files[0].id;
@@ -2237,47 +2421,154 @@
             .then(function(res) { 
                 if (res) return res.json(); 
             })
-            .then(function(fileData) {
-                if (!fileData) return;
+            .then(function(cloudData) {
+                gdriveState.syncing = false;
+                if (!cloudData || !cloudData.pairs) return;
 
-                if (fileData.pairs) {
-                    var importedCount = 0;
-                    Object.keys(fileData.pairs).forEach(function(pair) {
-                        localStorage.setItem('bias_' + pair, JSON.stringify(fileData.pairs[pair]));
-                        importedCount += fileData.pairs[pair].length;
+                // Smart merge: combine local and cloud data
+                var mergedCount = 0;
+                var newCount = 0;
+
+                Object.keys(cloudData.pairs).forEach(function(pair) {
+                    var cloudTrades = cloudData.pairs[pair] || [];
+                    var localData = localStorage.getItem('bias_' + pair);
+                    var localTrades = localData ? JSON.parse(localData) : [];
+
+                    // Create a map of existing local trades by ID
+                    var localMap = {};
+                    localTrades.forEach(function(t) {
+                        localMap[t.id] = t;
                     });
 
-                    var now = new Date().toLocaleTimeString();
-                    document.getElementById('gdriveLastSync').textContent = now;
-                    localStorage.setItem('gdrive_last_sync', now);
-                    
-                    addSyncLog('✅ Downloaded ' + importedCount + ' entries from Drive', 'success');
-                    showToast('✅ Data restored from Google Drive');
-                    
-                    // Reload current pair
+                    // Add cloud trades that don't exist locally
+                    cloudTrades.forEach(function(cloudTrade) {
+                        if (!localMap[cloudTrade.id]) {
+                            localTrades.push(cloudTrade);
+                            newCount++;
+                        }
+                    });
+
+                    // Sort by date
+                    localTrades.sort(function(a, b) {
+                        return new Date(a.date) - new Date(b.date);
+                    });
+
+                    // Save merged data
+                    localStorage.setItem('bias_' + pair, JSON.stringify(localTrades));
+                    mergedCount += localTrades.length;
+                });
+
+                var now = new Date().toLocaleTimeString();
+                gdriveState.lastSyncTime = now;
+                var el = document.getElementById('gdriveLastSync');
+                if (el) el.textContent = now;
+                localStorage.setItem('gdrive_last_sync', now);
+                
+                addSyncLog('✅ Merged ' + newCount + ' new entries from Drive', 'success');
+                showToast('✅ Synced! ' + newCount + ' new entries merged');
+                
+                // Reload current pair
+                loadHistory();
+                renderPairSelector();
+                renderStats();
+                updateStorageBadge();
+            })
+            .catch(function(err) {
+                gdriveState.syncing = false;
+                if (err !== 'No file found') {
+                    addSyncLog('Download error: ' + err, 'error');
+                    showToast('❌ Download failed');
+                }
+            });
+        }
+
+        // Auto-sync on app load (if signed in)
+        function autoSyncOnLoad() {
+            if (!gdriveState.accessToken) return;
+            
+            addSyncLog('🔄 Checking for updates...', 'info');
+            
+            // Fetch cloud data and merge
+            fetch('https://www.googleapis.com/drive/v3/files?q=name%3D%27forex_bias_data.json%27&spaces=drive', {
+                headers: { 'Authorization': 'Bearer ' + gdriveState.accessToken }
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (!data.files || data.files.length === 0) {
+                    addSyncLog('No cloud data yet - will upload on first save', 'info');
+                    return;
+                }
+
+                gdriveState.fileId = data.files[0].id;
+                
+                return fetch('https://www.googleapis.com/drive/v3/files/' + gdriveState.fileId + '?alt=media', {
+                    headers: { 'Authorization': 'Bearer ' + gdriveState.accessToken }
+                });
+            })
+            .then(function(res) { 
+                if (res) return res.json(); 
+            })
+            .then(function(cloudData) {
+                if (!cloudData || !cloudData.pairs) return;
+
+                var newCount = 0;
+
+                Object.keys(cloudData.pairs).forEach(function(pair) {
+                    var cloudTrades = cloudData.pairs[pair] || [];
+                    var localData = localStorage.getItem('bias_' + pair);
+                    var localTrades = localData ? JSON.parse(localData) : [];
+
+                    var localMap = {};
+                    localTrades.forEach(function(t) { localMap[t.id] = t; });
+
+                    cloudTrades.forEach(function(cloudTrade) {
+                        if (!localMap[cloudTrade.id]) {
+                            localTrades.push(cloudTrade);
+                            newCount++;
+                        }
+                    });
+
+                    localTrades.sort(function(a, b) {
+                        return new Date(a.date) - new Date(b.date);
+                    });
+
+                    localStorage.setItem('bias_' + pair, JSON.stringify(localTrades));
+                });
+
+                if (newCount > 0) {
+                    addSyncLog('✅ Merged ' + newCount + ' entries from cloud', 'success');
+                    showToast('📥 ' + newCount + ' new entries synced from cloud');
                     loadHistory();
                     renderPairSelector();
                     renderStats();
+                } else {
+                    addSyncLog('✅ Already up to date', 'success');
                 }
+                
+                updateStorageBadge();
             })
             .catch(function(err) {
-                addSyncLog('Download error: ' + err, 'error');
-                showToast('❌ Download failed');
+                addSyncLog('Auto-sync check failed: ' + err, 'warning');
             });
         }
 
         // Sign out of Google
         function handleGoogleSignOut() {
-            gdriveState.accessToken = null;
-            gdriveState.user = null;
-            gdriveState.fileId = null;
-            updateGDriveUI(false);
+            clearGDriveSession();
             addSyncLog('Signed out of Google', 'info');
             showToast('Signed out');
         }
 
         // ============ EVENT LISTENERS ============
-        window.addEventListener('online', function() { addSyncLog('Network: Online', 'info'); updateStorageBadge(); manualSync(); });
+        window.addEventListener('online', function() { 
+            addSyncLog('Network: Online', 'info'); 
+            updateStorageBadge(); 
+            // Auto-sync when coming back online
+            if (gdriveState.accessToken && !gdriveState.syncing) {
+                addSyncLog('🔄 Syncing after reconnect...', 'info');
+                autoSyncOnLoad();
+            }
+        });
         window.addEventListener('offline', function() { addSyncLog('Network: Offline', 'warning'); updateStorageBadge(); });
 
         init();
