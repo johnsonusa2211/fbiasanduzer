@@ -1,1 +1,1 @@
-# forex-bias-analyzer
+# Authroized redircet
