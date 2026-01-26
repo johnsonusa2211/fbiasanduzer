@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f172a">
-    <title>Smart Bias Analyzer v5.2</title>
+    <title>Smart Bias Analyzer v5.3</title>
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <style>
@@ -28,6 +28,17 @@
         .header-left h1 { color: white; font-size: 17px; font-weight: 700; }
         .header-left p { color: rgba(255,255,255,0.5); font-size: 10px; margin-top: 2px; }
         
+        /* Sync Status Bar */
+        .sync-status-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; margin-bottom: 10px;
+            background: rgba(255,255,255,0.05); border-radius: 10px;
+            font-size: 10px; color: rgba(255,255,255,0.7);
+        }
+        .sync-status-bar.synced { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); }
+        .sync-status-bar.local { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); }
+        .sync-time { font-weight: 600; }
+        
         .sync-badge {
             display: flex; align-items: center; gap: 5px;
             padding: 6px 10px; border-radius: 16px;
@@ -46,6 +57,7 @@
         .storage-panel { 
             background: #1e293b; color: white; border-radius: 14px; 
             margin-bottom: 10px; overflow: hidden; display: none;
+            position: relative; z-index: 100;
         }
         .storage-panel.show { display: block; }
         .storage-panel-header { 
@@ -88,6 +100,7 @@
         .card { 
             background: white; border-radius: 12px; padding: 14px; 
             margin-bottom: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            position: relative;
         }
         .card-title { 
             font-size: 13px; font-weight: 700; margin-bottom: 10px; 
@@ -114,17 +127,24 @@
         .btn-orange { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; }
         .btn-active { background: #eff6ff; border: 2px solid #6366f1; }
         .btn-sm { padding: 7px 10px; font-size: 10px; }
+        .btn-xs { padding: 4px 8px; font-size: 9px; }
         .btn-outline { background: transparent; border: 2px solid #e2e8f0; }
         .btn-outline-white { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; }
+        .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
         
         /* Inputs */
         .input { 
             width: 100%; padding: 9px 10px; border: 2px solid #e2e8f0; 
             border-radius: 8px; font-size: 13px; transition: all 0.2s;
+            position: relative; z-index: 1;
         }
-        .input:focus { outline: none; border-color: #6366f1; }
+        .input:focus { outline: none; border-color: #6366f1; z-index: 10; }
         .input.filled { border-color: #86efac; background: #f0fdf4; }
         .label { display: block; font-size: 10px; color: #64748b; margin-bottom: 3px; font-weight: 600; }
+        
+        /* Date input fix */
+        input[type="date"] { position: relative; z-index: 5; }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
         
         /* Mode Toggle */
         .mode-toggle {
@@ -139,11 +159,12 @@
         .mode-btn.live { background: #ef4444; color: white; }
         .mode-btn.backfill { background: #9333ea; color: white; }
         
-        /* Backfill Section */
+        /* Backfill Section - Fixed z-index */
         .backfill-section {
             background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
             border: 2px solid #c4b5fd; border-radius: 10px;
             padding: 12px; margin-bottom: 10px;
+            position: relative; z-index: 50;
         }
         
         /* Session Cards */
@@ -173,6 +194,9 @@
         .bias-neutral { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
         .bias-direction { font-size: 28px; font-weight: 800; }
         .bias-sub { font-size: 11px; opacity: 0.9; margin-top: 4px; }
+        .bias-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; margin-top: 8px; }
+        .badge-interim { background: rgba(255,255,255,0.2); }
+        .badge-confirmed { background: rgba(255,255,255,0.3); }
         
         /* Signal Cards */
         .signal { padding: 8px 10px; border-radius: 6px; margin-bottom: 5px; font-size: 11px; }
@@ -206,6 +230,17 @@
         .liq-label { font-size: 8px; opacity: 0.8; }
         .liq-value { font-size: 12px; font-weight: 700; margin: 3px 0; }
         .liq-status { font-size: 8px; font-weight: 700; }
+        
+        /* Interim Bias Display */
+        .interim-bias-card {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            border-radius: 10px; padding: 12px; margin-bottom: 10px; color: white;
+        }
+        .interim-bias-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .interim-bias-title { font-size: 12px; font-weight: 700; }
+        .interim-badge { background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 10px; font-size: 9px; }
+        .interim-direction { font-size: 20px; font-weight: 800; text-align: center; padding: 10px; }
+        .interim-details { font-size: 10px; opacity: 0.9; }
         
         /* Log Price */
         .log-price-section { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
@@ -265,13 +300,19 @@
         /* History */
         .history-item { 
             background: white; border-radius: 8px; padding: 10px; margin-bottom: 6px;
-            cursor: pointer; border: 1px solid #e2e8f0;
+            border: 1px solid #e2e8f0; position: relative;
         }
         .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .history-date { font-weight: 700; font-size: 12px; }
+        .history-date { font-weight: 700; font-size: 12px; cursor: pointer; }
         .history-badge { padding: 2px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; }
         .badge-bull { background: #dcfce7; color: #166534; }
         .badge-bear { background: #fee2e2; color: #991b1b; }
+        .history-actions { display: flex; gap: 4px; margin-top: 6px; }
+        .history-delete { 
+            background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+            padding: 4px 8px; border-radius: 4px; font-size: 9px; cursor: pointer;
+        }
+        .history-delete:hover { background: #fee2e2; }
         
         /* Toast */
         .toast { 
@@ -295,12 +336,18 @@
         <div class="header">
             <div class="header-left">
                 <h1>🎯 Smart Bias Analyzer</h1>
-                <p>SMT Sweep + Rejection • v5.2</p>
+                <p>SMT Sweep + Rejection • v5.3</p>
             </div>
             <div class="sync-badge local" id="syncBadge" onclick="toggleSyncPanel()">
                 <div class="sync-dot local" id="syncDot"></div>
                 <span id="syncText">Local</span>
             </div>
+        </div>
+
+        <!-- Sync Status Bar (visible when synced) -->
+        <div class="sync-status-bar local" id="syncStatusBar">
+            <span>💾 <span id="syncStatusText">Local storage only</span></span>
+            <span class="sync-time" id="lastSyncTime">--</span>
         </div>
 
         <!-- Storage Panel -->
@@ -381,7 +428,7 @@
                 <button class="mode-btn live" id="modeBtn" onclick="toggleMode()">🔴 Live</button>
             </div>
             
-            <!-- Backfill Section (hidden by default) - NOW WITH PAIR SELECTOR -->
+            <!-- Backfill Section - Fixed z-index -->
             <div class="backfill-section hidden" id="backfillSection">
                 <div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#7c3aed">📚 Backfill Mode</div>
                 <div class="grid grid-3">
@@ -481,14 +528,27 @@
                 </div>
             </div>
 
-            <button class="btn btn-primary" style="width:100%" onclick="analyzeBias()">🧠 Analyze SMT Bias</button>
-            <p style="font-size:9px;color:#64748b;text-align:center;margin-top:6px">⚠️ Price logs do NOT affect bias. Requires full OHLC + Analyze button.</p>
+            <div class="grid grid-2">
+                <button class="btn btn-purple" onclick="calculateInterimBias()">⚡ Interim Bias (Logs)</button>
+                <button class="btn btn-primary" onclick="analyzeBias()">🧠 Full Bias (OHLC)</button>
+            </div>
+            <p style="font-size:9px;color:#64748b;text-align:center;margin-top:6px">⚡ Interim = Uses price logs during session | 🧠 Full = Requires complete OHLC</p>
 
             <div id="biasResult"></div>
         </div>
 
         <!-- LONDON TAB -->
         <div id="tab-london" class="hidden">
+            <!-- Interim Bias Card -->
+            <div class="interim-bias-card" id="londonInterimBias">
+                <div class="interim-bias-header">
+                    <div class="interim-bias-title">⚡ London Interim Bias</div>
+                    <div class="interim-badge">LIVE</div>
+                </div>
+                <div class="interim-direction" id="londonInterimDirection">Awaiting data...</div>
+                <div class="interim-details" id="londonInterimDetails">Log prices to calculate real-time bias</div>
+            </div>
+
             <div class="window-card window-london">
                 <div class="window-header"><div class="window-title">🇬🇧 London Session</div><div class="window-time">3:00 - 7:00 PM</div></div>
                 <div class="window-section">
@@ -507,12 +567,12 @@
                 </div>
                 <div class="log-price-section">
                     <div class="log-price-title">📊 Log 15M Close Price</div>
-                    <div class="log-price-help">💡 For ML tracking only. Does NOT change bias.</div>
+                    <div class="log-price-help">💡 Logs update INTERIM bias in real-time!</div>
                     <div class="grid grid-2" style="margin-bottom:6px">
                         <select class="input" id="lonTime" style="color:#333;font-size:11px"><option value="15:30">3:30 PM</option><option value="16:00">4:00 PM</option><option value="16:30">4:30 PM</option><option value="17:00">5:00 PM</option><option value="18:00">6:00 PM</option><option value="19:00">7:00 PM</option></select>
                         <input type="number" step="0.00001" class="input" id="lonPrice" placeholder="15M Close" style="color:#333;font-size:12px">
                     </div>
-                    <button class="btn" style="width:100%;background:rgba(255,255,255,0.15);color:white;font-size:11px" onclick="logPrice('lon')">📝 Log</button>
+                    <button class="btn" style="width:100%;background:rgba(255,255,255,0.15);color:white;font-size:11px" onclick="logPrice('lon')">📝 Log & Update Bias</button>
                 </div>
             </div>
             <div id="lonPriceLog"></div>
@@ -520,6 +580,16 @@
 
         <!-- NY TAB -->
         <div id="tab-ny" class="hidden">
+            <!-- Interim Bias Card -->
+            <div class="interim-bias-card" id="nyInterimBias" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);">
+                <div class="interim-bias-header">
+                    <div class="interim-bias-title">⚡ NY Interim Bias</div>
+                    <div class="interim-badge">LIVE</div>
+                </div>
+                <div class="interim-direction" id="nyInterimDirection">Awaiting data...</div>
+                <div class="interim-details" id="nyInterimDetails">Log prices to calculate real-time bias</div>
+            </div>
+
             <div class="window-card window-ny">
                 <div class="window-header"><div class="window-title">🇺🇸 NY Overlap</div><div class="window-time">8:00 PM - 12:00 AM</div></div>
                 <div class="window-section">
@@ -543,7 +613,7 @@
                         <select class="input" id="nyTime" style="color:#333;font-size:11px"><option value="20:30">8:30 PM</option><option value="21:00">9:00 PM</option><option value="21:30">9:30 PM</option><option value="22:00">10:00 PM</option><option value="22:30">10:30 PM ⚠️</option><option value="23:00">11:00 PM ❌</option></select>
                         <input type="number" step="0.00001" class="input" id="nyPrice" placeholder="15M Close" style="color:#333;font-size:12px">
                     </div>
-                    <button class="btn" style="width:100%;background:rgba(255,255,255,0.15);color:white;font-size:11px" onclick="logPrice('ny')">📝 Log</button>
+                    <button class="btn" style="width:100%;background:rgba(255,255,255,0.15);color:white;font-size:11px" onclick="logPrice('ny')">📝 Log & Update Bias</button>
                 </div>
             </div>
             <div id="nyPriceLog"></div>
@@ -632,7 +702,7 @@
     <div class="toast" id="toast"></div>
 
     <script>
-    var state = { date: new Date().toISOString().split('T')[0], pair: 'GBPUSD', mode: 'live', tradeType: 'intraday', data: {}, checklist: {}, filter: 'all', syncLog: [] };
+    var state = { date: new Date().toISOString().split('T')[0], pair: 'GBPUSD', mode: 'live', tradeType: 'intraday', data: {}, checklist: {}, filter: 'all', syncLog: [], lastSync: null };
     var checkItems = {
         intraday: {
             setup: [{ key: 'h4Zone', label: '4H Supply/Demand Zone', critical: true },{ key: 'h4Imbalance', label: 'FVG Still Unfilled', critical: true },{ key: 'h1Nested', label: '1H Zone Inside 4H', critical: true },{ key: 'h1FVG', label: '1H FVG Present', critical: false }],
@@ -646,14 +716,29 @@
     function init() {
         document.getElementById('selectedDate').value = state.date;
         document.getElementById('backfillDate').value = state.date;
-        loadData(); loadDay(); renderChecklist(); checkWarnings(); updateStats(); updateStorageDetails(); loadGDriveConfig();
+        loadData(); loadDay(); renderChecklist(); checkWarnings(); updateStats(); updateStorageDetails(); loadGDriveConfig(); updateSyncStatusBar();
         setTimeout(restoreGDriveSession, 500);
-        addLog('App v5.2 initialized', 'info');
+        addLog('App v5.3 initialized', 'info');
     }
 
     function addLog(msg, type) { type = type || 'info'; var time = new Date().toLocaleTimeString().slice(0,5); state.syncLog.unshift({ time: time, msg: msg, type: type }); if (state.syncLog.length > 50) state.syncLog = state.syncLog.slice(0, 50); renderSyncLog(); }
     function renderSyncLog() { var el = document.getElementById('syncLog'); if (!el) return; el.innerHTML = state.syncLog.length === 0 ? '<div class="sync-log-entry info">Waiting...</div>' : state.syncLog.map(function(e) { return '<div class="sync-log-entry '+e.type+'">['+e.time+'] '+e.msg+'</div>'; }).join(''); }
     function clearSyncLog() { state.syncLog = []; addLog('Log cleared', 'info'); toast('Log cleared'); }
+
+    function updateSyncStatusBar() {
+        var bar = document.getElementById('syncStatusBar');
+        var text = document.getElementById('syncStatusText');
+        var time = document.getElementById('lastSyncTime');
+        if (gdrive.token) {
+            bar.className = 'sync-status-bar synced';
+            text.textContent = '☁️ Google Drive connected';
+            time.textContent = state.lastSync ? 'Last: ' + state.lastSync : 'Ready';
+        } else {
+            bar.className = 'sync-status-bar local';
+            text.textContent = '💾 Local storage only';
+            time.textContent = 'Not synced';
+        }
+    }
 
     function toggleMode() {
         state.mode = state.mode === 'live' ? 'backfill' : 'live';
@@ -682,7 +767,7 @@
             if (day.checklist) state.checklist = day.checklist;
             updateSessionOutcomeDisplay('asia', day); updateSessionOutcomeDisplay('london', day); updateSessionOutcomeDisplay('ny', day);
         } else { clearFields(); state.checklist = {}; ['asia','london','ny'].forEach(function(s) { document.getElementById(s + 'OutcomeStatus').innerHTML = ''; }); }
-        updateStatusBadges(); updateLiqDisplays(); renderChecklist(); renderPriceLogs();
+        updateStatusBadges(); updateLiqDisplays(); renderChecklist(); renderPriceLogs(); updateInterimBias('lon'); updateInterimBias('ny');
     }
 
     function setVal(id, v) { var el = document.getElementById(id); if (el && v !== null && v !== undefined) { el.value = v; el.classList.add('filled'); } else if (el) { el.value = ''; el.classList.remove('filled'); } }
@@ -705,6 +790,74 @@
     function updateSessionOutcomeDisplay(session, day) { var statusEl = document.getElementById(session + 'OutcomeStatus'); if (day.outcomes && day.outcomes[session]) { var actual = day.outcomes[session]; var predicted = day.predicted; var isCorrect = predicted && predicted.toLowerCase() === actual.toLowerCase(); statusEl.innerHTML = '<div class="outcome-recorded '+(isCorrect?'':'wrong')+'">'+(isCorrect?'✅':'❌')+' '+actual+'</div>'; } else { statusEl.innerHTML = ''; } }
     function recordSessionOutcome(session, outcome) { if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; var d = state.data[state.date]; if (!d.outcomes) d.outcomes = {}; d.outcomes[session] = outcome; saveData(); updateSessionOutcomeDisplay(session, d); addLog(session + ': ' + outcome, 'success'); toast('📈 ' + session + ' recorded'); }
 
+    // INTERIM BIAS - Uses price logs during session
+    function calculateInterimBias() {
+        var d = state.data[state.date];
+        if (!d || !d.asia || !d.asia.h || !d.asia.l) { toast('⚠️ Need Asia OHLC first'); return; }
+        if (!d.logs || d.logs.length === 0) { toast('⚠️ Log prices first'); return; }
+
+        var lonLogs = d.logs.filter(function(l) { return l.session === 'lon'; });
+        if (lonLogs.length === 0) { toast('⚠️ No London price logs'); return; }
+
+        var result = calculateInterimFromLogs(d.asia, lonLogs, d.sweeps || []);
+        d.interimBias = result;
+        saveData();
+
+        var html = '<div class="bias-result ' + (result.bias === 'BULLISH' ? 'bias-bullish' : result.bias === 'BEARISH' ? 'bias-bearish' : 'bias-neutral') + '">';
+        html += '<div class="bias-direction">' + result.bias + '</div>';
+        html += '<div class="bias-sub">Confidence: ' + result.confidence + '%</div>';
+        html += '<div class="bias-badge badge-interim">⚡ INTERIM (from ' + lonLogs.length + ' logs)</div>';
+        html += '</div>';
+        html += '<div class="card"><div class="card-title">📋 Interim Signals</div>';
+        result.signals.forEach(function(s) { html += '<div class="signal signal-' + s.type + '"><div class="signal-title">' + s.title + '</div><div class="signal-detail">' + s.detail + '</div></div>'; });
+        html += '</div>';
+        document.getElementById('biasResult').innerHTML = html;
+        addLog('Interim Bias: ' + result.bias, 'info');
+    }
+
+    function calculateInterimFromLogs(asia, logs, sweeps) {
+        var latestPrice = logs[logs.length - 1].price;
+        var highestLog = Math.max.apply(null, logs.map(function(l) { return l.price; }));
+        var lowestLog = Math.min.apply(null, logs.map(function(l) { return l.price; }));
+        var asiaMid = (asia.h + asia.l) / 2;
+
+        var bull = 0, bear = 0, signals = [];
+        var sweptHigh = highestLog > asia.h || sweeps.some(function(s) { return s.session === 'lon' && s.level === 'high'; });
+        var sweptLow = lowestLog < asia.l || sweeps.some(function(s) { return s.session === 'lon' && s.level === 'low'; });
+
+        if (sweptLow && latestPrice > asiaMid) { bull += 4; signals.push({ type: 'bull', title: '🎯 Swept Low + Above Mid', detail: 'Bearish liquidity grabbed, price rejected up' }); }
+        if (sweptHigh && latestPrice < asiaMid) { bear += 4; signals.push({ type: 'bear', title: '🎯 Swept High + Below Mid', detail: 'Bullish liquidity grabbed, price rejected down' }); }
+        if (sweptHigh && latestPrice > asia.h) { bull += 2; signals.push({ type: 'bull', title: '📈 Bullish Continuation', detail: 'Holding above Asia high' }); }
+        if (sweptLow && latestPrice < asia.l) { bear += 2; signals.push({ type: 'bear', title: '📉 Bearish Continuation', detail: 'Holding below Asia low' }); }
+        if (latestPrice > asiaMid && !sweptHigh && !sweptLow) { bull += 1; signals.push({ type: 'neutral', title: '➡️ Above midpoint', detail: 'No sweep yet' }); }
+        if (latestPrice < asiaMid && !sweptHigh && !sweptLow) { bear += 1; signals.push({ type: 'neutral', title: '➡️ Below midpoint', detail: 'No sweep yet' }); }
+
+        var total = bull + bear;
+        var bias = bull > bear && bull >= 2 ? 'BULLISH' : bear > bull && bear >= 2 ? 'BEARISH' : 'NEUTRAL';
+        var confidence = total > 0 ? Math.round((Math.max(bull, bear) / total) * 100) : 50;
+
+        return { bias: bias, confidence: confidence, signals: signals, latestPrice: latestPrice };
+    }
+
+    function updateInterimBias(session) {
+        var d = state.data[state.date];
+        var dirEl = document.getElementById(session === 'lon' ? 'londonInterimDirection' : 'nyInterimDirection');
+        var detailEl = document.getElementById(session === 'lon' ? 'londonInterimDetails' : 'nyInterimDetails');
+
+        if (!d || !d.logs) { dirEl.textContent = 'Awaiting data...'; detailEl.textContent = 'Log prices to calculate'; return; }
+
+        var prevSession = session === 'lon' ? d.asia : d.london;
+        if (!prevSession || !prevSession.h || !prevSession.l) { dirEl.textContent = 'Need ' + (session === 'lon' ? 'Asia' : 'London') + ' OHLC'; detailEl.textContent = 'Complete previous session first'; return; }
+
+        var logs = d.logs.filter(function(l) { return l.session === session; });
+        if (logs.length === 0) { dirEl.textContent = 'No logs yet'; detailEl.textContent = 'Start logging 15M closes'; return; }
+
+        var result = calculateInterimFromLogs(prevSession, logs, d.sweeps || []);
+        dirEl.innerHTML = result.bias + ' <span style="font-size:14px;opacity:0.8">(' + result.confidence + '%)</span>';
+        detailEl.textContent = 'Latest: ' + result.latestPrice.toFixed(5) + ' | ' + logs.length + ' logs';
+    }
+
+    // FULL BIAS - Uses complete OHLC
     function analyzeBias() {
         var d = state.data[state.date]; if (!d || !d.asia || !d.london) { toast('⚠️ Enter Asia + London data'); return; }
         var asia = d.asia, lon = d.london, key = d.key; if (!asia.h || !asia.l || !lon.h || !lon.l || !lon.c) { toast('⚠️ Need full OHLC'); return; }
@@ -720,7 +873,7 @@
         else if (bear > bull && bear >= 3) { bias = 'BEARISH'; biasClass = 'bias-bearish'; conf = Math.round(bear/total*100); }
         else { bias = 'NEUTRAL'; biasClass = 'bias-neutral'; conf = 50; }
         d.predicted = bias; d.biasDetails = { bull: bull, bear: bear, conf: conf, at: new Date().toISOString() }; saveData(); addLog('Bias: ' + bias + ' (' + conf + '%)', 'info');
-        var html = '<div class="bias-result '+biasClass+'"><div class="bias-direction">'+bias+'</div><div class="bias-sub">Confidence: '+conf+'%</div></div>';
+        var html = '<div class="bias-result '+biasClass+'"><div class="bias-direction">'+bias+'</div><div class="bias-sub">Confidence: '+conf+'%</div><div class="bias-badge badge-confirmed">✅ CONFIRMED (Full OHLC)</div></div>';
         html += '<div class="card"><div class="card-title">📋 Signals</div>'; signals.forEach(function(s) { html += '<div class="signal signal-'+s.type+'"><div class="signal-title">'+s.title+'</div><div class="signal-detail">'+s.detail+'</div></div>'; }); html += '</div>';
         document.getElementById('biasResult').innerHTML = html;
     }
@@ -738,9 +891,9 @@
         if (d && d.sweeps) { d.sweeps.forEach(function(s) { var boxId = (s.session === 'lon' ? 'lon' : 'ny') + (s.level === 'high' ? 'High' : 'Low') + 'Box'; var statusId = (s.session === 'lon' ? 'lon' : 'ny') + (s.level === 'high' ? 'High' : 'Low') + 'Status'; document.getElementById(boxId).classList.add('swept'); document.getElementById(statusId).textContent = '✅ SWEPT'; }); }
     }
 
-    function toggleLiq(session, level) { var key = session + (level === 'high' ? 'High' : 'Low'); var box = document.getElementById(key + 'Box'); var status = document.getElementById(key + 'Status'); if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [], sweeps: [] }; if (!state.data[state.date].sweeps) state.data[state.date].sweeps = []; if (box.classList.contains('swept')) { box.classList.remove('swept'); status.textContent = '⬜ Not Swept'; state.data[state.date].sweeps = state.data[state.date].sweeps.filter(function(s) { return !(s.session === session && s.level === level); }); } else { box.classList.add('swept'); status.textContent = '✅ SWEPT'; state.data[state.date].sweeps.push({ session: session, level: level, at: new Date().toISOString() }); } saveData(); }
+    function toggleLiq(session, level) { var key = session + (level === 'high' ? 'High' : 'Low'); var box = document.getElementById(key + 'Box'); var status = document.getElementById(key + 'Status'); if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [], sweeps: [] }; if (!state.data[state.date].sweeps) state.data[state.date].sweeps = []; if (box.classList.contains('swept')) { box.classList.remove('swept'); status.textContent = '⬜ Not Swept'; state.data[state.date].sweeps = state.data[state.date].sweeps.filter(function(s) { return !(s.session === session && s.level === level); }); } else { box.classList.add('swept'); status.textContent = '✅ SWEPT'; state.data[state.date].sweeps.push({ session: session, level: level, at: new Date().toISOString() }); } saveData(); updateInterimBias(session); }
 
-    function logPrice(session) { var time = document.getElementById(session + 'Time').value; var price = parseFloat(document.getElementById(session + 'Price').value); if (!price) { toast('⚠️ Enter price'); return; } if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; if (!state.data[state.date].logs) state.data[state.date].logs = []; state.data[state.date].logs.push({ session: session, time: time, price: price, at: new Date().toISOString() }); saveData(); document.getElementById(session + 'Price').value = ''; toast('📝 Logged ' + time); renderPriceLogs(); }
+    function logPrice(session) { var time = document.getElementById(session + 'Time').value; var price = parseFloat(document.getElementById(session + 'Price').value); if (!price) { toast('⚠️ Enter price'); return; } if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; if (!state.data[state.date].logs) state.data[state.date].logs = []; state.data[state.date].logs.push({ session: session, time: time, price: price, at: new Date().toISOString() }); saveData(); document.getElementById(session + 'Price').value = ''; toast('📝 Logged ' + time); renderPriceLogs(); updateInterimBias(session); }
     function renderPriceLogs() { var d = state.data[state.date]; if (!d || !d.logs || d.logs.length === 0) { document.getElementById('lonPriceLog').innerHTML = ''; document.getElementById('nyPriceLog').innerHTML = ''; return; } ['lon', 'ny'].forEach(function(s) { var logs = d.logs.filter(function(l) { return l.session === s; }).slice(-5); var html = ''; if (logs.length > 0) { html = '<div class="card"><div class="card-title" style="font-size:11px">📊 Price Log</div>'; logs.forEach(function(l) { html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #e2e8f0;font-size:10px"><span>'+l.time+'</span><span style="font-weight:600">'+l.price.toFixed(5)+'</span></div>'; }); html += '</div>'; } document.getElementById(s + 'PriceLog').innerHTML = html; }); }
 
     function renderChecklist() { var items = checkItems[state.tradeType]; ['setup', 'trap', 'trigger', 'entry', 'risk'].forEach(function(phase) { var html = ''; if (items && items[phase]) { items[phase].forEach(function(item) { var checked = state.checklist[item.key]; html += '<div class="check-item '+(checked?'checked':'')+'" onclick="toggleCheck(\''+item.key+'\')"><div class="check-box">'+(checked?'<span class="check-mark">✓</span>':'')+'</div><span>'+item.label+(item.critical?' ⭐':'')+'</span></div>'; }); } var el = document.getElementById('check' + phase.charAt(0).toUpperCase() + phase.slice(1)); if (el) el.innerHTML = html; }); calculateGrade(); }
@@ -772,28 +925,64 @@
 
     function updateStorageDetails() { document.getElementById('detailType').textContent = gdrive.token ? 'Cloud + Local' : 'Local Only'; document.getElementById('detailCloud').textContent = gdrive.token ? '✅ Yes' : '❌ No'; document.getElementById('detailNetwork').textContent = navigator.onLine ? '✅ Online' : '❌ Offline'; var gu = localStorage.getItem('bias_v5_GBPUSD'); var gj = localStorage.getItem('bias_v5_GBPJPY'); document.getElementById('detailGU').textContent = gu ? Object.keys(JSON.parse(gu)).length : 0; document.getElementById('detailGJ').textContent = gj ? Object.keys(JSON.parse(gj)).length : 0; var size = (gu ? gu.length : 0) + (gj ? gj.length : 0); document.getElementById('detailSize').textContent = (size / 1024).toFixed(1) + ' KB'; }
 
-    function renderHistory() { var dates = Object.keys(state.data).sort().reverse(); if (dates.length === 0) { document.getElementById('historyList').innerHTML = '<p style="text-align:center;color:#64748b;padding:20px;font-size:12px">No data</p>'; return; } var html = ''; dates.forEach(function(dateKey) { var d = state.data[dateKey]; var predicted = d.predicted || '--'; var londonActual = d.outcomes?.london || '--'; var correct = predicted !== '--' && londonActual !== '--' && predicted.toLowerCase() === londonActual.toLowerCase(); var wrong = predicted !== '--' && londonActual !== '--' && !correct; var hasTrades = d.trades && d.trades.length > 0; if (state.filter === 'correct' && !correct) return; if (state.filter === 'wrong' && !wrong) return; if (state.filter === 'trades' && !hasTrades) return; var badgeClass = predicted === 'BULLISH' ? 'badge-bull' : predicted === 'BEARISH' ? 'badge-bear' : ''; html += '<div class="history-item" onclick="loadDateFromHistory(\''+dateKey+'\')">'; html += '<div class="history-header"><div class="history-date">'+formatDate(dateKey)+'</div><span class="history-badge '+badgeClass+'">'+predicted+'</span></div>'; html += '<div style="font-size:10px;color:#64748b">London: <b>'+londonActual+'</b>'; if (londonActual !== '--' && predicted !== '--') html += correct ? ' ✅' : ' ❌'; if (hasTrades) { var wins = d.trades.filter(function(t) { return t.result === 'win'; }).length; html += ' | '+wins+'W-'+(d.trades.length-wins)+'L'; } html += '</div></div>'; }); document.getElementById('historyList').innerHTML = html || '<p style="text-align:center;color:#64748b;padding:20px;font-size:12px">No matches</p>'; }
+    // HISTORY WITH DELETE
+    function renderHistory() {
+        var dates = Object.keys(state.data).sort().reverse();
+        if (dates.length === 0) { document.getElementById('historyList').innerHTML = '<p style="text-align:center;color:#64748b;padding:20px;font-size:12px">No data</p>'; return; }
+        var html = '';
+        dates.forEach(function(dateKey) {
+            var d = state.data[dateKey];
+            var predicted = d.predicted || '--';
+            var londonActual = d.outcomes?.london || '--';
+            var correct = predicted !== '--' && londonActual !== '--' && predicted.toLowerCase() === londonActual.toLowerCase();
+            var wrong = predicted !== '--' && londonActual !== '--' && !correct;
+            var hasTrades = d.trades && d.trades.length > 0;
+            if (state.filter === 'correct' && !correct) return;
+            if (state.filter === 'wrong' && !wrong) return;
+            if (state.filter === 'trades' && !hasTrades) return;
+            var badgeClass = predicted === 'BULLISH' ? 'badge-bull' : predicted === 'BEARISH' ? 'badge-bear' : '';
+            html += '<div class="history-item">';
+            html += '<div class="history-header"><div class="history-date" onclick="loadDateFromHistory(\''+dateKey+'\')">'+formatDate(dateKey)+'</div><span class="history-badge '+badgeClass+'">'+predicted+'</span></div>';
+            html += '<div style="font-size:10px;color:#64748b">London: <b>'+londonActual+'</b>';
+            if (londonActual !== '--' && predicted !== '--') html += correct ? ' ✅' : ' ❌';
+            if (hasTrades) { var wins = d.trades.filter(function(t) { return t.result === 'win'; }).length; html += ' | '+wins+'W-'+(d.trades.length-wins)+'L'; }
+            html += '</div>';
+            html += '<div class="history-actions"><button class="history-delete" onclick="deleteHistoryEntry(\''+dateKey+'\')">🗑️ Delete</button></div>';
+            html += '</div>';
+        });
+        document.getElementById('historyList').innerHTML = html || '<p style="text-align:center;color:#64748b;padding:20px;font-size:12px">No matches</p>';
+    }
+
+    function deleteHistoryEntry(dateKey) {
+        if (!confirm('Delete entry for ' + formatDate(dateKey) + '? This cannot be undone.')) return;
+        delete state.data[dateKey];
+        saveData();
+        renderHistory();
+        toast('🗑️ Deleted');
+        addLog('Deleted: ' + dateKey, 'warning');
+    }
+
     function filterHistory(filter, btn) { state.filter = filter; document.querySelectorAll('#tab-history .btn-sm').forEach(function(b) { b.classList.remove('btn-active'); }); if (btn) btn.classList.add('btn-active'); renderHistory(); }
     function loadDateFromHistory(dateKey) { if (state.mode === 'backfill') document.getElementById('backfillDate').value = dateKey; else document.getElementById('selectedDate').value = dateKey; loadDay(); showTab('analyze'); }
     function formatDate(str) { var d = new Date(str); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
 
-    function exportData() { var all = {}; ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); }); var blob = new Blob([JSON.stringify({ version: 5.2, exportedAt: new Date().toISOString(), pairs: all }, null, 2)], { type: 'application/json' }); var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'forex_bias_v5.2_' + state.date + '.json'; a.click(); toast('📤 Exported'); }
+    function exportData() { var all = {}; ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); }); var blob = new Blob([JSON.stringify({ version: 5.3, exportedAt: new Date().toISOString(), pairs: all }, null, 2)], { type: 'application/json' }); var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'forex_bias_v5.3_' + state.date + '.json'; a.click(); toast('📤 Exported'); }
     function importData(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function(e) { try { var data = JSON.parse(e.target.result); if (data.pairs) { Object.keys(data.pairs).forEach(function(p) { localStorage.setItem('bias_v5_' + p, JSON.stringify(data.pairs[p])); }); } loadData(); loadDay(); toast('📥 Imported!'); } catch (err) { toast('❌ Import failed'); } }; reader.readAsText(file); }
 
     var gdrive = { clientId: null, token: null };
     function loadGDriveConfig() { gdrive.clientId = localStorage.getItem('gdrive_client_id') || ''; document.getElementById('gdriveClientId').value = gdrive.clientId; }
     function saveGDriveConfig() { gdrive.clientId = document.getElementById('gdriveClientId').value.trim(); localStorage.setItem('gdrive_client_id', gdrive.clientId); }
-    function initGoogleAuth() { if (!gdrive.clientId) { toast('⚠️ Enter Client ID'); return; } try { google.accounts.oauth2.initTokenClient({ client_id: gdrive.clientId, scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email', callback: function(response) { if (response.access_token) { gdrive.token = response.access_token; localStorage.setItem('gdrive_token', gdrive.token); localStorage.setItem('gdrive_token_expiry', Date.now() + 3600000); fetchUserInfo(); toast('✅ Connected'); } } }).requestAccessToken(); } catch (e) { toast('❌ Auth failed'); } }
+    function initGoogleAuth() { if (!gdrive.clientId) { toast('⚠️ Enter Client ID'); return; } try { google.accounts.oauth2.initTokenClient({ client_id: gdrive.clientId, scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email', callback: function(response) { if (response.access_token) { gdrive.token = response.access_token; localStorage.setItem('gdrive_token', gdrive.token); localStorage.setItem('gdrive_token_expiry', Date.now() + 3600000); fetchUserInfo(); toast('✅ Connected'); updateSyncStatusBar(); } } }).requestAccessToken(); } catch (e) { toast('❌ Auth failed'); } }
     function restoreGDriveSession() { var token = localStorage.getItem('gdrive_token'); var expiry = localStorage.getItem('gdrive_token_expiry'); if (token && expiry && Date.now() < parseInt(expiry)) { gdrive.token = token; fetchUserInfo(); } }
-    function fetchUserInfo() { fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }).then(function(r) { return r.json(); }).then(function(user) { document.getElementById('gdrivePhoto').src = user.picture || ''; document.getElementById('gdriveName').textContent = user.name || 'User'; document.getElementById('gdriveEmail').textContent = user.email || ''; document.getElementById('gdriveNotConnected').classList.add('hidden'); document.getElementById('gdriveConnected').classList.remove('hidden'); document.getElementById('syncBadge').className = 'sync-badge synced'; document.getElementById('syncDot').className = 'sync-dot synced'; document.getElementById('syncText').textContent = '☁️ Synced'; updateStats(); }).catch(clearGDriveSession); }
-    function signOutGDrive() { clearGDriveSession(); toast('Signed out'); }
-    function clearGDriveSession() { gdrive.token = null; localStorage.removeItem('gdrive_token'); localStorage.removeItem('gdrive_token_expiry'); document.getElementById('gdriveNotConnected').classList.remove('hidden'); document.getElementById('gdriveConnected').classList.add('hidden'); document.getElementById('syncBadge').className = 'sync-badge local'; document.getElementById('syncDot').className = 'sync-dot local'; document.getElementById('syncText').textContent = 'Local'; updateStats(); }
+    function fetchUserInfo() { fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }).then(function(r) { return r.json(); }).then(function(user) { document.getElementById('gdrivePhoto').src = user.picture || ''; document.getElementById('gdriveName').textContent = user.name || 'User'; document.getElementById('gdriveEmail').textContent = user.email || ''; document.getElementById('gdriveNotConnected').classList.add('hidden'); document.getElementById('gdriveConnected').classList.remove('hidden'); document.getElementById('syncBadge').className = 'sync-badge synced'; document.getElementById('syncDot').className = 'sync-dot synced'; document.getElementById('syncText').textContent = '☁️ Synced'; updateStats(); updateSyncStatusBar(); }).catch(clearGDriveSession); }
+    function signOutGDrive() { clearGDriveSession(); toast('Signed out'); updateSyncStatusBar(); }
+    function clearGDriveSession() { gdrive.token = null; localStorage.removeItem('gdrive_token'); localStorage.removeItem('gdrive_token_expiry'); document.getElementById('gdriveNotConnected').classList.remove('hidden'); document.getElementById('gdriveConnected').classList.add('hidden'); document.getElementById('syncBadge').className = 'sync-badge local'; document.getElementById('syncDot').className = 'sync-dot local'; document.getElementById('syncText').textContent = 'Local'; updateStats(); updateSyncStatusBar(); }
     function autoSync() { if (gdrive.token) uploadToGDrive(true); }
     function manualSync() { if (gdrive.token) uploadToGDrive(false); else toast('⚠️ Connect GDrive first'); }
-    function uploadToGDrive(silent) { if (!gdrive.token) return; document.getElementById('syncDot').className = 'sync-dot syncing'; var all = {}; ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); }); var content = JSON.stringify({ version: 5.2, updatedAt: new Date().toISOString(), pairs: all }); var fileId = localStorage.getItem('gdrive_file_id'); if (fileId) { fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + gdrive.token, 'Content-Type': 'application/json' }, body: content }).then(function() { document.getElementById('syncDot').className = 'sync-dot synced'; if (!silent) toast('⬆️ Uploaded'); }).catch(function() { document.getElementById('syncDot').className = 'sync-dot synced'; }); } else { var metadata = { name: 'forex_bias_v5.json', mimeType: 'application/json' }; var form = new FormData(); form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' })); form.append('file', new Blob([content], { type: 'application/json' })); fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Authorization': 'Bearer ' + gdrive.token }, body: form }).then(function(r) { return r.json(); }).then(function(file) { localStorage.setItem('gdrive_file_id', file.id); document.getElementById('syncDot').className = 'sync-dot synced'; if (!silent) toast('⬆️ Uploaded'); }).catch(function() { document.getElementById('syncDot').className = 'sync-dot synced'; }); } }
-    function downloadFromGDrive() { if (!gdrive.token) return; document.getElementById('syncDot').className = 'sync-dot syncing'; fetch('https://www.googleapis.com/drive/v3/files?q=name%3D%27forex_bias_v5.json%27&spaces=drive', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }).then(function(r) { return r.json(); }).then(function(result) { if (result.files && result.files.length > 0) { var fileId = result.files[0].id; localStorage.setItem('gdrive_file_id', fileId); return fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }); } throw new Error('No file'); }).then(function(r) { return r.json(); }).then(function(data) { if (data.pairs) { var newCount = 0; Object.keys(data.pairs).forEach(function(p) { var local = JSON.parse(localStorage.getItem('bias_v5_' + p) || '{}'); var cloud = data.pairs[p]; Object.keys(cloud).forEach(function(dateKey) { if (!local[dateKey]) { local[dateKey] = cloud[dateKey]; newCount++; } }); localStorage.setItem('bias_v5_' + p, JSON.stringify(local)); }); loadData(); loadDay(); document.getElementById('syncDot').className = 'sync-dot synced'; toast('⬇️ Downloaded' + (newCount > 0 ? ' (+' + newCount + ')' : '')); } }).catch(function(e) { document.getElementById('syncDot').className = 'sync-dot synced'; toast('⚠️ ' + e.message); }); }
+    function uploadToGDrive(silent) { if (!gdrive.token) return; document.getElementById('syncDot').className = 'sync-dot syncing'; var all = {}; ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); }); var content = JSON.stringify({ version: 5.3, updatedAt: new Date().toISOString(), pairs: all }); var fileId = localStorage.getItem('gdrive_file_id'); if (fileId) { fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + gdrive.token, 'Content-Type': 'application/json' }, body: content }).then(function() { document.getElementById('syncDot').className = 'sync-dot synced'; state.lastSync = new Date().toLocaleTimeString().slice(0,5); updateSyncStatusBar(); if (!silent) toast('☁️ Uploaded to GDrive'); addLog('Uploaded to GDrive', 'success'); }).catch(function() { document.getElementById('syncDot').className = 'sync-dot synced'; }); } else { var metadata = { name: 'forex_bias_v5.json', mimeType: 'application/json' }; var form = new FormData(); form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' })); form.append('file', new Blob([content], { type: 'application/json' })); fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Authorization': 'Bearer ' + gdrive.token }, body: form }).then(function(r) { return r.json(); }).then(function(file) { localStorage.setItem('gdrive_file_id', file.id); document.getElementById('syncDot').className = 'sync-dot synced'; state.lastSync = new Date().toLocaleTimeString().slice(0,5); updateSyncStatusBar(); if (!silent) toast('☁️ Uploaded to GDrive'); addLog('Created GDrive file', 'success'); }).catch(function() { document.getElementById('syncDot').className = 'sync-dot synced'; }); } }
+    function downloadFromGDrive() { if (!gdrive.token) return; document.getElementById('syncDot').className = 'sync-dot syncing'; fetch('https://www.googleapis.com/drive/v3/files?q=name%3D%27forex_bias_v5.json%27&spaces=drive', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }).then(function(r) { return r.json(); }).then(function(result) { if (result.files && result.files.length > 0) { var fileId = result.files[0].id; localStorage.setItem('gdrive_file_id', fileId); return fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }); } throw new Error('No file'); }).then(function(r) { return r.json(); }).then(function(data) { if (data.pairs) { var newCount = 0; Object.keys(data.pairs).forEach(function(p) { var local = JSON.parse(localStorage.getItem('bias_v5_' + p) || '{}'); var cloud = data.pairs[p]; Object.keys(cloud).forEach(function(dateKey) { if (!local[dateKey]) { local[dateKey] = cloud[dateKey]; newCount++; } }); localStorage.setItem('bias_v5_' + p, JSON.stringify(local)); }); loadData(); loadDay(); document.getElementById('syncDot').className = 'sync-dot synced'; state.lastSync = new Date().toLocaleTimeString().slice(0,5); updateSyncStatusBar(); toast('☁️ Downloaded' + (newCount > 0 ? ' (+' + newCount + ' days)' : '')); addLog('Downloaded from GDrive', 'success'); } }).catch(function(e) { document.getElementById('syncDot').className = 'sync-dot synced'; toast('⚠️ ' + e.message); }); }
 
-    function showTab(name) { ['analyze', 'london', 'ny', 'checklist', 'stats', 'history'].forEach(function(t) { document.getElementById('tab-' + t).classList.add('hidden'); }); document.getElementById('tab-' + name).classList.remove('hidden'); document.querySelectorAll('.tabs .tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); if (name === 'history') renderHistory(); if (name === 'stats') updateStatsDisplay(); if (name === 'london' || name === 'ny') { updateLiqDisplays(); renderPriceLogs(); } }
+    function showTab(name) { ['analyze', 'london', 'ny', 'checklist', 'stats', 'history'].forEach(function(t) { document.getElementById('tab-' + t).classList.add('hidden'); }); document.getElementById('tab-' + name).classList.remove('hidden'); document.querySelectorAll('.tabs .tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); if (name === 'history') renderHistory(); if (name === 'stats') updateStatsDisplay(); if (name === 'london' || name === 'ny') { updateLiqDisplays(); renderPriceLogs(); updateInterimBias(name === 'london' ? 'lon' : 'ny'); } }
     function showStorageTab(name) { ['Status', 'Log', 'Details', 'Gdrive'].forEach(function(t) { document.getElementById('storageTab' + t).classList.add('hidden'); }); document.getElementById('storageTab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.remove('hidden'); document.querySelectorAll('.storage-tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); }
     function toggleSyncPanel() { document.getElementById('syncPanel').classList.toggle('show'); }
     function toast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 3000); }
