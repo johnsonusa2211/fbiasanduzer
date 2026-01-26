@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f172a">
     <title>Smart Bias Analyzer v5.3</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
@@ -77,6 +79,14 @@
         .sync-log-entry.error { color: #f87171; }
         .sync-log-entry.info { color: #60a5fa; }
         .storage-detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 11px; }
+        
+        .gdrive-section { background: rgba(66,133,244,0.15); border: 1px solid rgba(66,133,244,0.3); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        .gdrive-title { font-size: 12px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+        .gdrive-btn { background: #4285f4; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 6px; }
+        .gdrive-btn:hover { background: #3367d6; }
+        .gdrive-btn.connected { background: #34a853; }
+        .gdrive-btn.disconnect { background: #ea4335; }
+        .gdrive-status { font-size: 10px; text-align: center; opacity: 0.8; }
         
         .tabs { 
             display: flex; gap: 3px; margin-bottom: 10px; padding: 4px;
@@ -254,13 +264,13 @@
             </div>
             <div class="sync-badge local" id="syncBadge" onclick="toggleSyncPanel()">
                 <div class="sync-dot local" id="syncDot"></div>
-                <span id="syncText">Checking...</span>
+                <span id="syncText">Local</span>
             </div>
         </div>
 
         <div class="sync-status-bar local" id="syncStatusBar">
-            <span>💾 <span id="syncStatusText">Checking storage...</span></span>
-            <span class="sync-time" id="lastSyncTime">--</span>
+            <span>💾 <span id="syncStatusText">Local storage only</span></span>
+            <span class="sync-time" id="lastSyncTime">Not synced</span>
         </div>
 
         <div class="storage-panel" id="syncPanel">
@@ -270,11 +280,11 @@
             </div>
             <div class="storage-tabs">
                 <button class="storage-tab active" onclick="showStorageTab('status')">📊 Status</button>
+                <button class="storage-tab" onclick="showStorageTab('gdrive')">☁️ GDrive</button>
                 <button class="storage-tab" onclick="showStorageTab('log')">📋 Log</button>
-                <button class="storage-tab" onclick="showStorageTab('details')">⚙️ Details</button>
             </div>
             <div class="storage-content" id="storageTabStatus">
-                <div id="syncStatusAlert" class="alert alert-info" style="color:white;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.3)">Checking...</div>
+                <div id="syncStatusAlert" class="alert alert-info" style="color:white;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.3)">Connect Google Drive for cross-device sync</div>
                 <div class="storage-stats">
                     <div class="storage-stat"><div class="storage-stat-value" id="statDays">0</div><div class="storage-stat-label">Days</div></div>
                     <div class="storage-stat"><div class="storage-stat-value" id="statAccuracy">--%</div><div class="storage-stat-label">Accuracy</div></div>
@@ -285,15 +295,19 @@
                     <button class="btn btn-sm btn-orange" onclick="clearSyncLog()">🗑️ Clear Log</button>
                 </div>
             </div>
+            <div class="storage-content hidden" id="storageTabGdrive">
+                <div class="gdrive-section">
+                    <div class="gdrive-title">☁️ Google Drive Sync</div>
+                    <button class="gdrive-btn" id="gdriveBtn" onclick="handleGDriveAuth()">🔗 Connect Google Drive</button>
+                    <div class="gdrive-status" id="gdriveStatus">Not connected</div>
+                </div>
+                <div class="grid grid-2" style="gap:6px;margin-top:10px">
+                    <button class="btn btn-sm btn-green" onclick="uploadToGDrive()">⬆️ Upload</button>
+                    <button class="btn btn-sm btn-primary" onclick="downloadFromGDrive()">⬇️ Download</button>
+                </div>
+            </div>
             <div class="storage-content hidden" id="storageTabLog">
                 <div class="sync-log" id="syncLog"><div class="sync-log-entry info">Waiting...</div></div>
-            </div>
-            <div class="storage-content hidden" id="storageTabDetails">
-                <div class="storage-detail-row"><span style="opacity:0.7">Storage Type</span><span id="detailType">--</span></div>
-                <div class="storage-detail-row"><span style="opacity:0.7">Cloud Available</span><span id="detailCloud">--</span></div>
-                <div class="storage-detail-row"><span style="opacity:0.7">Network</span><span id="detailNetwork">--</span></div>
-                <div class="storage-detail-row"><span style="opacity:0.7">GBPUSD Days</span><span id="detailGU">0</span></div>
-                <div class="storage-detail-row"><span style="opacity:0.7">GBPJPY Days</span><span id="detailGJ">0</span></div>
             </div>
         </div>
 
@@ -512,7 +526,8 @@
     <div class="toast" id="toast"></div>
 
     <script>
-    var state = { date: new Date().toISOString().split('T')[0], pair: 'GBPUSD', mode: 'live', data: {}, checklist: {}, filter: 'all', syncLog: [], lastSync: null, cloudAvailable: false };
+    // ========== STATE ==========
+    var state = { date: new Date().toISOString().split('T')[0], pair: 'GBPUSD', mode: 'live', data: {}, checklist: {}, filter: 'all', syncLog: [], lastSync: null, gdriveConnected: false, gdriveToken: null };
     var checkItems = {
         setup: [{ key: 'h4Zone', label: '4H S/D Zone', critical: true },{ key: 'h4Imbalance', label: 'FVG Unfilled', critical: true },{ key: 'h1Nested', label: '1H Inside 4H', critical: true },{ key: 'h1FVG', label: '1H FVG', critical: false }],
         trap: [{ key: 'inducementCreated', label: 'Inducement Created', critical: true },{ key: 'priceDrawnAway', label: 'Price Drawn Away', critical: false },{ key: 'inducementUntapped', label: 'Inducement Untapped', critical: false }],
@@ -521,89 +536,284 @@
         risk: [{ key: 'notMonday', label: 'Not Monday', critical: false },{ key: 'goodSession', label: 'London/NY Overlap', critical: false },{ key: 'noRevenge', label: 'Not Revenge', critical: false },{ key: 'riskManaged', label: 'Risk ≤1%', critical: false }]
     };
 
-    async function init() {
+    // Google Drive Config
+    var GDRIVE_CLIENT_ID = '728893584210-u21dv0t1lbrnq1j6kcs4q6p49dkfdro1.apps.googleusercontent.com';
+    var GDRIVE_API_KEY = 'AIzaSyBjvnW9h4cI3C9nY1eLWOGEOhNxMDj2KDA';
+    var GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    var gdriveTokenClient = null;
+    var gdriveFileId = null;
+
+    // ========== INIT ==========
+    function init() {
         document.getElementById('selectedDate').value = state.date;
         document.getElementById('backfillDate').value = state.date;
-        await checkCloudStorage();
-        await loadFromCloud();
-        loadDay(); renderChecklist(); checkWarnings(); updateStats(); updateStorageDetails();
+        loadData(); loadDay(); renderChecklist(); checkWarnings(); updateStats();
+        initGoogleDrive();
         addLog('App v5.3 initialized', 'info');
     }
 
-    async function checkCloudStorage() {
-        try {
-            if (typeof window.storage !== 'undefined') {
-                await window.storage.get('test');
-                state.cloudAvailable = true;
-                addLog('☁️ Cloud storage AVAILABLE', 'success');
-            } else {
-                state.cloudAvailable = false;
-                addLog('📱 Local storage only', 'warning');
-            }
-        } catch (e) {
-            state.cloudAvailable = false;
-            addLog('Cloud check: ' + e.message, 'error');
+    // ========== GOOGLE DRIVE ==========
+    function initGoogleDrive() {
+        var savedToken = localStorage.getItem('gdrive_token');
+        if (savedToken) {
+            state.gdriveToken = savedToken;
+            state.gdriveConnected = true;
+            updateGDriveUI();
+            addLog('☁️ GDrive token restored', 'success');
         }
-        updateSyncStatusBar();
-    }
-
-    async function loadFromCloud() {
-        if (!state.cloudAvailable) { loadData(); return; }
+        
         try {
-            var cloudData = await window.storage.get('bias_v5_all');
-            if (cloudData && cloudData.value) {
-                var parsed = JSON.parse(cloudData.value);
-                if (parsed.GBPUSD) localStorage.setItem('bias_v5_GBPUSD', JSON.stringify(parsed.GBPUSD));
-                if (parsed.GBPJPY) localStorage.setItem('bias_v5_GBPJPY', JSON.stringify(parsed.GBPJPY));
-                addLog('⬇️ Downloaded from cloud', 'success');
-                state.lastSync = new Date().toLocaleTimeString().slice(0,5);
-            }
-        } catch (e) { addLog('Cloud load: ' + e.message, 'error'); }
-        loadData(); updateSyncStatusBar();
-    }
-
-    async function saveToCloud() {
-        if (!state.cloudAvailable) return;
+            gapi.load('client', function() {
+                gapi.client.init({ apiKey: GDRIVE_API_KEY, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] })
+                .then(function() { addLog('GDrive API loaded', 'info'); })
+                .catch(function(e) { addLog('GDrive init: ' + e.message, 'warning'); });
+            });
+        } catch(e) { addLog('GDrive load error', 'warning'); }
+        
         try {
-            document.getElementById('syncDot').className = 'sync-dot syncing';
-            var all = {};
-            ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); });
-            await window.storage.set('bias_v5_all', JSON.stringify(all));
-            state.lastSync = new Date().toLocaleTimeString().slice(0,5);
-            addLog('⬆️ Synced to cloud', 'success');
-            document.getElementById('syncDot').className = 'sync-dot synced';
-            updateSyncStatusBar();
-        } catch (e) { addLog('Cloud save: ' + e.message, 'error'); document.getElementById('syncDot').className = 'sync-dot local'; }
+            google.accounts.oauth2.initTokenClient({
+                client_id: GDRIVE_CLIENT_ID,
+                scope: GDRIVE_SCOPES,
+                callback: handleGDriveToken
+            });
+            gdriveTokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GDRIVE_CLIENT_ID,
+                scope: GDRIVE_SCOPES,
+                callback: handleGDriveToken
+            });
+        } catch(e) { addLog('OAuth init error', 'warning'); }
     }
 
-    async function manualSync() {
-        if (!state.cloudAvailable) { toast('⚠️ Cloud not available'); return; }
-        await loadFromCloud(); await saveToCloud(); toast('☁️ Synced!');
+    function handleGDriveAuth() {
+        if (state.gdriveConnected) {
+            state.gdriveConnected = false;
+            state.gdriveToken = null;
+            localStorage.removeItem('gdrive_token');
+            updateGDriveUI();
+            addLog('Disconnected from GDrive', 'warning');
+            toast('Disconnected');
+            return;
+        }
+        if (gdriveTokenClient) {
+            gdriveTokenClient.requestAccessToken();
+        } else {
+            toast('⚠️ GDrive not ready');
+        }
     }
 
-    function updateSyncStatusBar() {
-        var bar = document.getElementById('syncStatusBar');
-        var text = document.getElementById('syncStatusText');
-        var time = document.getElementById('lastSyncTime');
+    function handleGDriveToken(response) {
+        if (response.error) {
+            addLog('GDrive auth error: ' + response.error, 'error');
+            toast('❌ Auth failed');
+            return;
+        }
+        state.gdriveToken = response.access_token;
+        state.gdriveConnected = true;
+        localStorage.setItem('gdrive_token', response.access_token);
+        updateGDriveUI();
+        addLog('☁️ Connected to GDrive!', 'success');
+        toast('☁️ Connected!');
+        downloadFromGDrive();
+    }
+
+    function updateGDriveUI() {
+        var btn = document.getElementById('gdriveBtn');
+        var status = document.getElementById('gdriveStatus');
         var badge = document.getElementById('syncBadge');
         var dot = document.getElementById('syncDot');
-        var badgeText = document.getElementById('syncText');
+        var text = document.getElementById('syncText');
+        var bar = document.getElementById('syncStatusBar');
+        var barText = document.getElementById('syncStatusText');
+        var syncTime = document.getElementById('lastSyncTime');
         var alert = document.getElementById('syncStatusAlert');
-        if (state.cloudAvailable) {
-            bar.className = 'sync-status-bar synced'; text.textContent = '☁️ Cloud sync active'; time.textContent = state.lastSync ? 'Last: ' + state.lastSync : 'Ready';
-            badge.className = 'sync-badge synced'; dot.className = 'sync-dot synced'; badgeText.textContent = '☁️ Synced';
-            alert.innerHTML = '✅ Cloud sync active!'; alert.style.background = 'rgba(34,197,94,0.2)';
+        
+        if (state.gdriveConnected) {
+            btn.textContent = '❌ Disconnect';
+            btn.className = 'gdrive-btn disconnect';
+            status.textContent = '✅ Connected';
+            badge.className = 'sync-badge synced';
+            dot.className = 'sync-dot synced';
+            text.textContent = '☁️ GDrive';
+            bar.className = 'sync-status-bar synced';
+            barText.textContent = '☁️ Google Drive connected';
+            syncTime.textContent = state.lastSync ? 'Last: ' + state.lastSync : 'Ready';
+            alert.innerHTML = '✅ Connected! Data syncs across devices.';
+            alert.style.background = 'rgba(34,197,94,0.2)';
         } else {
-            bar.className = 'sync-status-bar local'; text.textContent = '📱 Local only'; time.textContent = 'Not synced';
-            badge.className = 'sync-badge local'; dot.className = 'sync-dot local'; badgeText.textContent = 'Local';
-            alert.innerHTML = '⚠️ Local only. Cloud not available.'; alert.style.background = 'rgba(245,158,11,0.2)';
+            btn.textContent = '🔗 Connect Google Drive';
+            btn.className = 'gdrive-btn';
+            status.textContent = 'Not connected';
+            badge.className = 'sync-badge local';
+            dot.className = 'sync-dot local';
+            text.textContent = 'Local';
+            bar.className = 'sync-status-bar local';
+            barText.textContent = '💾 Local storage only';
+            syncTime.textContent = 'Not synced';
+            alert.innerHTML = '⚠️ Connect Google Drive for cross-device sync';
+            alert.style.background = 'rgba(245,158,11,0.2)';
         }
     }
 
+    async function uploadToGDrive() {
+        if (!state.gdriveConnected || !state.gdriveToken) {
+            toast('⚠️ Connect GDrive first');
+            return;
+        }
+        
+        document.getElementById('syncDot').className = 'sync-dot syncing';
+        addLog('⬆️ Uploading to GDrive...', 'info');
+        
+        var allData = {};
+        ['GBPUSD', 'GBPJPY'].forEach(function(p) {
+            var d = localStorage.getItem('bias_v5_' + p);
+            if (d) allData[p] = JSON.parse(d);
+        });
+        
+        var content = JSON.stringify({ version: 5.3, updatedAt: new Date().toISOString(), pairs: allData }, null, 2);
+        var blob = new Blob([content], { type: 'application/json' });
+        
+        try {
+            var fileId = localStorage.getItem('gdrive_file_id');
+            var url, method;
+            
+            if (fileId) {
+                url = 'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media';
+                method = 'PATCH';
+            } else {
+                var metadata = { name: 'forex_bias_v5.json', mimeType: 'application/json' };
+                var form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', blob);
+                
+                var response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + state.gdriveToken },
+                    body: form
+                });
+                
+                if (response.ok) {
+                    var result = await response.json();
+                    localStorage.setItem('gdrive_file_id', result.id);
+                    state.lastSync = new Date().toLocaleTimeString().slice(0, 5);
+                    updateGDriveUI();
+                    addLog('⬆️ Uploaded! ID: ' + result.id, 'success');
+                    toast('☁️ Uploaded to GDrive!');
+                } else {
+                    throw new Error('Upload failed: ' + response.status);
+                }
+                document.getElementById('syncDot').className = 'sync-dot synced';
+                return;
+            }
+            
+            var response = await fetch(url, {
+                method: method,
+                headers: { 'Authorization': 'Bearer ' + state.gdriveToken, 'Content-Type': 'application/json' },
+                body: content
+            });
+            
+            if (response.ok) {
+                state.lastSync = new Date().toLocaleTimeString().slice(0, 5);
+                updateGDriveUI();
+                addLog('⬆️ Updated on GDrive!', 'success');
+                toast('☁️ Uploaded to GDrive!');
+            } else {
+                localStorage.removeItem('gdrive_file_id');
+                await uploadToGDrive();
+            }
+        } catch (e) {
+            addLog('Upload error: ' + e.message, 'error');
+            toast('❌ Upload failed');
+        }
+        document.getElementById('syncDot').className = state.gdriveConnected ? 'sync-dot synced' : 'sync-dot local';
+    }
+
+    async function downloadFromGDrive() {
+        if (!state.gdriveConnected || !state.gdriveToken) {
+            toast('⚠️ Connect GDrive first');
+            return;
+        }
+        
+        document.getElementById('syncDot').className = 'sync-dot syncing';
+        addLog('⬇️ Downloading from GDrive...', 'info');
+        
+        try {
+            var searchUrl = "https://www.googleapis.com/drive/v3/files?q=name='forex_bias_v5.json'&spaces=drive&fields=files(id,name,modifiedTime)";
+            var searchResponse = await fetch(searchUrl, {
+                headers: { 'Authorization': 'Bearer ' + state.gdriveToken }
+            });
+            
+            if (!searchResponse.ok) throw new Error('Search failed');
+            
+            var searchResult = await searchResponse.json();
+            if (!searchResult.files || searchResult.files.length === 0) {
+                addLog('No file found, will create on upload', 'info');
+                toast('No cloud data yet');
+                document.getElementById('syncDot').className = 'sync-dot synced';
+                return;
+            }
+            
+            var fileId = searchResult.files[0].id;
+            localStorage.setItem('gdrive_file_id', fileId);
+            
+            var downloadUrl = 'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media';
+            var downloadResponse = await fetch(downloadUrl, {
+                headers: { 'Authorization': 'Bearer ' + state.gdriveToken }
+            });
+            
+            if (!downloadResponse.ok) throw new Error('Download failed');
+            
+            var cloudData = await downloadResponse.json();
+            var merged = 0;
+            
+            if (cloudData.pairs) {
+                Object.keys(cloudData.pairs).forEach(function(pair) {
+                    var local = localStorage.getItem('bias_v5_' + pair);
+                    var localData = local ? JSON.parse(local) : {};
+                    var cloudPairData = cloudData.pairs[pair];
+                    
+                    Object.keys(cloudPairData).forEach(function(dateKey) {
+                        if (!localData[dateKey]) {
+                            localData[dateKey] = cloudPairData[dateKey];
+                            merged++;
+                        }
+                    });
+                    
+                    localStorage.setItem('bias_v5_' + pair, JSON.stringify(localData));
+                });
+            }
+            
+            state.lastSync = new Date().toLocaleTimeString().slice(0, 5);
+            updateGDriveUI();
+            loadData();
+            loadDay();
+            updateStats();
+            
+            addLog('⬇️ Downloaded! (+' + merged + ' days)', 'success');
+            toast('☁️ Downloaded (+' + merged + ' days)');
+            
+        } catch (e) {
+            addLog('Download error: ' + e.message, 'error');
+            toast('❌ Download failed');
+        }
+        document.getElementById('syncDot').className = state.gdriveConnected ? 'sync-dot synced' : 'sync-dot local';
+    }
+
+    function manualSync() {
+        if (state.gdriveConnected) {
+            uploadToGDrive();
+        } else {
+            toast('⚠️ Connect GDrive first');
+            toggleSyncPanel();
+            showStorageTab('gdrive');
+        }
+    }
+
+    // ========== SYNC LOG ==========
     function addLog(msg, type) { type = type || 'info'; var time = new Date().toLocaleTimeString().slice(0,5); state.syncLog.unshift({ time: time, msg: msg, type: type }); if (state.syncLog.length > 50) state.syncLog = state.syncLog.slice(0, 50); renderSyncLog(); }
     function renderSyncLog() { var el = document.getElementById('syncLog'); el.innerHTML = state.syncLog.length === 0 ? '<div class="sync-log-entry info">Waiting...</div>' : state.syncLog.map(function(e) { return '<div class="sync-log-entry '+e.type+'">['+e.time+'] '+e.msg+'</div>'; }).join(''); }
     function clearSyncLog() { state.syncLog = []; addLog('Log cleared', 'info'); toast('Log cleared'); }
 
+    // ========== MODE ==========
     function toggleMode() {
         state.mode = state.mode === 'live' ? 'backfill' : 'live';
         var btn = document.getElementById('modeBtn');
@@ -611,8 +821,9 @@
         else { btn.textContent = '🔴 Live'; btn.className = 'mode-btn live'; document.getElementById('backfillSection').classList.add('hidden'); document.getElementById('liveDateCard').classList.remove('hidden'); document.getElementById('selectedDate').value = new Date().toISOString().split('T')[0]; loadDay(); }
     }
 
+    // ========== DATA ==========
     function loadData() { var saved = localStorage.getItem('bias_v5_' + state.pair); state.data = saved ? JSON.parse(saved) : {}; }
-    function saveData() { localStorage.setItem('bias_v5_' + state.pair, JSON.stringify(state.data)); updateStats(); updateStorageDetails(); saveToCloud(); }
+    function saveData() { localStorage.setItem('bias_v5_' + state.pair, JSON.stringify(state.data)); updateStats(); if (state.gdriveConnected) uploadToGDrive(); }
 
     function loadDay() {
         state.date = state.mode === 'backfill' ? document.getElementById('backfillDate').value : document.getElementById('selectedDate').value;
@@ -650,6 +861,7 @@
     function updateSessionOutcomeDisplay(session, day) { var statusEl = document.getElementById(session + 'OutcomeStatus'); if (day.outcomes && day.outcomes[session]) { var actual = day.outcomes[session]; statusEl.innerHTML = '<div class="outcome-recorded">✅ '+actual+'</div>'; } else { statusEl.innerHTML = ''; } }
     function recordSessionOutcome(session, outcome) { if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; var d = state.data[state.date]; if (!d.outcomes) d.outcomes = {}; d.outcomes[session] = outcome; saveData(); updateSessionOutcomeDisplay(session, d); toast('📈 ' + session + ' recorded'); }
 
+    // ========== INTERIM BIAS ==========
     function calculateInterimBias() {
         var d = state.data[state.date];
         if (!d || !d.asia || !d.asia.h || !d.asia.l) { toast('⚠️ Need Asia OHLC'); return; }
@@ -716,6 +928,7 @@
 
     function checkWarnings() { var html = ''; var day = new Date().getDay(); if (day === 1) html += '<div class="alert alert-error">⚠️ MONDAY!</div>'; if (day === 0 || day === 6) html += '<div class="alert alert-error">📅 WEEKEND</div>'; document.getElementById('warnings').innerHTML = html; }
 
+    // ========== LIQUIDITY ==========
     function updateLiqDisplays() {
         var d = state.data[state.date];
         document.getElementById('lonHighVal').textContent = d && d.asia && d.asia.h ? d.asia.h.toFixed(5) : '--';
@@ -732,12 +945,14 @@
     function logPrice(session) { var time = document.getElementById(session + 'Time').value; var price = parseFloat(document.getElementById(session + 'Price').value); if (!price) { toast('⚠️ Enter price'); return; } if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; if (!state.data[state.date].logs) state.data[state.date].logs = []; state.data[state.date].logs.push({ session: session, time: time, price: price, at: new Date().toISOString() }); saveData(); document.getElementById(session + 'Price').value = ''; toast('📝 Logged'); renderPriceLogs(); updateInterimBias(session); }
     function renderPriceLogs() { var d = state.data[state.date]; if (!d || !d.logs) { document.getElementById('lonPriceLog').innerHTML = ''; document.getElementById('nyPriceLog').innerHTML = ''; return; } ['lon', 'ny'].forEach(function(s) { var logs = d.logs.filter(function(l) { return l.session === s; }).slice(-5); var html = ''; if (logs.length > 0) { html = '<div class="card"><div class="card-title" style="font-size:11px">📊 Log</div>'; logs.forEach(function(l) { html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #e2e8f0;font-size:10px"><span>'+l.time+'</span><span style="font-weight:600">'+l.price.toFixed(5)+'</span></div>'; }); html += '</div>'; } document.getElementById(s + 'PriceLog').innerHTML = html; }); }
 
+    // ========== CHECKLIST ==========
     function renderChecklist() { ['setup', 'trap', 'trigger', 'entry', 'risk'].forEach(function(phase) { var html = ''; if (checkItems[phase]) { checkItems[phase].forEach(function(item) { var checked = state.checklist[item.key]; html += '<div class="check-item '+(checked?'checked':'')+'" onclick="toggleCheck(\''+item.key+'\')"><div class="check-box">'+(checked?'<span class="check-mark">✓</span>':'')+'</div><span>'+item.label+(item.critical?' ⭐':'')+'</span></div>'; }); } var el = document.getElementById('check' + phase.charAt(0).toUpperCase() + phase.slice(1)); if (el) el.innerHTML = html; }); calculateGrade(); }
     function toggleCheck(key) { state.checklist[key] = !state.checklist[key]; if (state.data[state.date]) { state.data[state.date].checklist = state.checklist; saveData(); } renderChecklist(); }
     function calculateGrade() { var criticals = ['h4Zone','h4Imbalance','h1Nested','inducementCreated','inducementSwept','h1BodyClose','m5Sweep','m5BodyClose']; var total = Object.keys(state.checklist).filter(function(k) { return state.checklist[k]; }).length; var critical = criticals.filter(function(k) { return state.checklist[k]; }).length; var grade, gradeClass, rec; if (critical === 8 && total >= 15) { grade = 'A+'; gradeClass = 'grade-aplus'; rec = '✅ TAKE IT'; } else if (critical >= 7 && total >= 12) { grade = 'A'; gradeClass = 'grade-a'; rec = '✅ Good'; } else if (critical >= 5) { grade = 'B'; gradeClass = 'grade-b'; rec = '⚠️ ~30% WR'; } else { grade = 'C'; gradeClass = 'grade-c'; rec = '❌ SKIP'; } var html = '<div class="grade-box '+gradeClass+'"><div class="grade-letter">'+grade+'</div><div class="grade-label">'+total+'/19 • '+critical+'/8 critical</div><div style="margin-top:6px;font-size:12px">'+rec+'</div></div>'; document.getElementById('gradeResult').innerHTML = html; document.getElementById('tradeButtons').classList.toggle('hidden', grade !== 'A+' && grade !== 'A'); }
 
     function recordTrade(result) { if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; if (!state.data[state.date].trades) state.data[state.date].trades = []; var criticals = ['h4Zone','h4Imbalance','h1Nested','inducementCreated','inducementSwept','h1BodyClose','m5Sweep','m5BodyClose']; var critical = criticals.filter(function(k) { return state.checklist[k]; }).length; var grade = critical === 8 ? 'A+' : critical >= 7 ? 'A' : critical >= 5 ? 'B' : 'C'; state.data[state.date].trades.push({ result: result, grade: grade, at: new Date().toISOString() }); saveData(); toast(result === 'win' ? '✅ Win!' : '❌ Loss'); updateStatsDisplay(); }
 
+    // ========== STATS ==========
     function updateStats() { var days = Object.keys(state.data).length; var total = 0, correct = 0, trades = 0; Object.values(state.data).forEach(function(d) { if (d.predicted && d.outcomes && d.outcomes.london) { total++; if (d.predicted.toLowerCase() === d.outcomes.london.toLowerCase()) correct++; } if (d.trades) trades += d.trades.length; }); document.getElementById('statDays').textContent = days; document.getElementById('statAccuracy').textContent = total > 0 ? Math.round(correct/total*100)+'%' : '--%'; document.getElementById('statTrades').textContent = trades; }
 
     function updateStatsDisplay() {
@@ -752,8 +967,7 @@
         ['A+', 'A', 'B', 'C'].forEach(function(g) { var t = gradeStats[g].w + gradeStats[g].l; var wr = t > 0 ? Math.round(gradeStats[g].w/t*100) : 0; var id = g === 'A+' ? 'aplusWinRate' : g.toLowerCase() + 'WinRate'; document.getElementById(id).textContent = t > 0 ? wr + '% (' + t + ')' : '--'; });
     }
 
-    function updateStorageDetails() { document.getElementById('detailType').textContent = state.cloudAvailable ? 'Cloud + Local' : 'Local Only'; document.getElementById('detailCloud').textContent = state.cloudAvailable ? '✅ Yes' : '❌ No'; document.getElementById('detailNetwork').textContent = navigator.onLine ? '✅ Online' : '❌ Offline'; var gu = localStorage.getItem('bias_v5_GBPUSD'); var gj = localStorage.getItem('bias_v5_GBPJPY'); document.getElementById('detailGU').textContent = gu ? Object.keys(JSON.parse(gu)).length : 0; document.getElementById('detailGJ').textContent = gj ? Object.keys(JSON.parse(gj)).length : 0; }
-
+    // ========== HISTORY ==========
     function renderHistory() {
         var dates = Object.keys(state.data).sort().reverse();
         if (dates.length === 0) { document.getElementById('historyList').innerHTML = '<p style="text-align:center;color:#64748b;padding:20px;font-size:12px">No data</p>'; return; }
@@ -773,16 +987,17 @@
         document.getElementById('historyList').innerHTML = html || '<p style="text-align:center;color:#64748b;padding:20px;font-size:12px">No matches</p>';
     }
 
-    function deleteHistoryEntry(dateKey) { if (!confirm('Delete ' + formatDate(dateKey) + '?')) return; delete state.data[dateKey]; saveData(); renderHistory(); toast('🗑️ Deleted'); }
+    function deleteHistoryEntry(dateKey) { if (!confirm('Delete ' + formatDate(dateKey) + '?')) return; delete state.data[dateKey]; saveData(); renderHistory(); toast('🗑️ Deleted'); addLog('Deleted ' + dateKey, 'warning'); }
     function filterHistory(filter, btn) { state.filter = filter; document.querySelectorAll('#tab-history .btn-sm').forEach(function(b) { b.classList.remove('btn-active'); }); if (btn) btn.classList.add('btn-active'); renderHistory(); }
     function loadDateFromHistory(dateKey) { if (state.mode === 'backfill') document.getElementById('backfillDate').value = dateKey; else document.getElementById('selectedDate').value = dateKey; loadDay(); showTab('analyze'); }
     function formatDate(str) { var d = new Date(str); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
 
     function exportData() { var all = {}; ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); }); var blob = new Blob([JSON.stringify({ version: 5.3, exportedAt: new Date().toISOString(), pairs: all }, null, 2)], { type: 'application/json' }); var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'forex_bias_v5.3_' + state.date + '.json'; a.click(); toast('📤 Exported'); }
-    function importData(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function(e) { try { var data = JSON.parse(e.target.result); if (data.pairs) { Object.keys(data.pairs).forEach(function(p) { localStorage.setItem('bias_v5_' + p, JSON.stringify(data.pairs[p])); }); } loadData(); loadDay(); saveToCloud(); toast('📥 Imported!'); } catch (err) { toast('❌ Failed'); } }; reader.readAsText(file); }
+    function importData(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function(e) { try { var data = JSON.parse(e.target.result); if (data.pairs) { Object.keys(data.pairs).forEach(function(p) { localStorage.setItem('bias_v5_' + p, JSON.stringify(data.pairs[p])); }); } loadData(); loadDay(); if (state.gdriveConnected) uploadToGDrive(); toast('📥 Imported!'); } catch (err) { toast('❌ Failed'); } }; reader.readAsText(file); }
 
+    // ========== UI ==========
     function showTab(name) { ['analyze', 'london', 'ny', 'checklist', 'stats', 'history'].forEach(function(t) { document.getElementById('tab-' + t).classList.add('hidden'); }); document.getElementById('tab-' + name).classList.remove('hidden'); document.querySelectorAll('.tabs .tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); if (name === 'history') renderHistory(); if (name === 'stats') updateStatsDisplay(); if (name === 'london' || name === 'ny') { updateLiqDisplays(); renderPriceLogs(); updateInterimBias(name === 'london' ? 'lon' : 'ny'); } }
-    function showStorageTab(name) { ['Status', 'Log', 'Details'].forEach(function(t) { document.getElementById('storageTab' + t).classList.add('hidden'); }); document.getElementById('storageTab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.remove('hidden'); document.querySelectorAll('.storage-tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); }
+    function showStorageTab(name) { ['Status', 'Gdrive', 'Log'].forEach(function(t) { var el = document.getElementById('storageTab' + t); if (el) el.classList.add('hidden'); }); var target = document.getElementById('storageTab' + name.charAt(0).toUpperCase() + name.slice(1)); if (target) target.classList.remove('hidden'); document.querySelectorAll('.storage-tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); }
     function toggleSyncPanel() { document.getElementById('syncPanel').classList.toggle('show'); }
     function toast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 3000); }
 
