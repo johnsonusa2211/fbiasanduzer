@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f172a">
     <title>Smart Bias Analyzer v5.3</title>
-    <script src="https://apis.google.com/js/api.js"></script>
-    <script src="https://accounts.google.com/gsi/client"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
@@ -18,7 +16,6 @@
         }
         .container { max-width: 500px; margin: 0 auto; }
         
-        /* Header */
         .header { 
             display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 10px; padding: 12px 14px;
@@ -28,7 +25,6 @@
         .header-left h1 { color: white; font-size: 17px; font-weight: 700; }
         .header-left p { color: rgba(255,255,255,0.5); font-size: 10px; margin-top: 2px; }
         
-        /* Sync Status Bar */
         .sync-status-bar {
             display: flex; align-items: center; justify-content: space-between;
             padding: 8px 12px; margin-bottom: 10px;
@@ -53,7 +49,6 @@
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
         @keyframes spin { to{transform:rotate(360deg)} }
         
-        /* Storage Panel */
         .storage-panel { 
             background: #1e293b; color: white; border-radius: 14px; 
             margin-bottom: 10px; overflow: hidden; display: none;
@@ -83,7 +78,6 @@
         .sync-log-entry.info { color: #60a5fa; }
         .storage-detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 11px; }
         
-        /* Tabs */
         .tabs { 
             display: flex; gap: 3px; margin-bottom: 10px; padding: 4px;
             background: rgba(255,255,255,0.08); border-radius: 12px; overflow-x: auto;
@@ -96,7 +90,6 @@
         .tab:hover { background: rgba(255,255,255,0.05); }
         .tab.active { background: white; color: #1e293b; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
         
-        /* Cards */
         .card { 
             background: white; border-radius: 12px; padding: 14px; 
             margin-bottom: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08);
@@ -107,13 +100,11 @@
             display: flex; align-items: center; gap: 6px; color: #1e293b;
         }
         
-        /* Grid */
         .grid { display: grid; gap: 6px; }
         .grid-2 { grid-template-columns: repeat(2,1fr); }
         .grid-3 { grid-template-columns: repeat(3,1fr); }
         .grid-4 { grid-template-columns: repeat(4,1fr); }
         
-        /* Buttons */
         .btn { 
             padding: 10px 14px; border: none; border-radius: 8px; 
             background: #f1f5f9; cursor: pointer; font-size: 12px; 
@@ -127,47 +118,30 @@
         .btn-orange { background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; }
         .btn-active { background: #eff6ff; border: 2px solid #6366f1; }
         .btn-sm { padding: 7px 10px; font-size: 10px; }
-        .btn-xs { padding: 4px 8px; font-size: 9px; }
-        .btn-outline { background: transparent; border: 2px solid #e2e8f0; }
-        .btn-outline-white { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white; }
-        .btn-danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
         
-        /* Inputs */
         .input { 
             width: 100%; padding: 9px 10px; border: 2px solid #e2e8f0; 
             border-radius: 8px; font-size: 13px; transition: all 0.2s;
-            position: relative; z-index: 1;
         }
-        .input:focus { outline: none; border-color: #6366f1; z-index: 10; }
+        .input:focus { outline: none; border-color: #6366f1; }
         .input.filled { border-color: #86efac; background: #f0fdf4; }
         .label { display: block; font-size: 10px; color: #64748b; margin-bottom: 3px; font-weight: 600; }
         
-        /* Date input fix */
-        input[type="date"] { position: relative; z-index: 5; }
-        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
-        
-        /* Mode Toggle */
         .mode-toggle {
             display: flex; align-items: center; justify-content: space-between;
             padding: 10px 12px; background: #f8fafc; border-radius: 10px; margin-bottom: 10px;
         }
         .mode-toggle-label { font-size: 12px; font-weight: 600; }
-        .mode-btn {
-            padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
-            cursor: pointer; border: none; transition: all 0.2s;
-        }
+        .mode-btn { padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: none; }
         .mode-btn.live { background: #ef4444; color: white; }
         .mode-btn.backfill { background: #9333ea; color: white; }
         
-        /* Backfill Section - Fixed z-index */
         .backfill-section {
             background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
             border: 2px solid #c4b5fd; border-radius: 10px;
             padding: 12px; margin-bottom: 10px;
-            position: relative; z-index: 50;
         }
         
-        /* Session Cards */
         .session-card { border-radius: 10px; padding: 12px; margin-bottom: 8px; }
         .session-key { background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border: 1px solid #c4b5fd; }
         .session-asia { background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%); border: 1px solid #fde047; }
@@ -179,34 +153,19 @@
         .status-pending { background: rgba(0,0,0,0.08); color: #64748b; }
         .status-complete { background: #dcfce7; color: #166534; }
         
-        /* Session Outcome */
-        .session-outcome {
-            background: rgba(0,0,0,0.03); border-radius: 8px; padding: 10px; margin-top: 10px;
-        }
+        .session-outcome { background: rgba(0,0,0,0.03); border-radius: 8px; padding: 10px; margin-top: 10px; }
         .session-outcome-title { font-size: 10px; font-weight: 600; color: #64748b; margin-bottom: 8px; }
         .outcome-recorded { font-size: 11px; padding: 8px; background: #f0fdf4; border-radius: 6px; color: #166534; text-align: center; }
         .outcome-recorded.wrong { background: #fef2f2; color: #991b1b; }
         
-        /* Bias Result */
         .bias-result { text-align: center; padding: 20px; border-radius: 12px; margin: 10px 0; color: white; }
         .bias-bullish { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
         .bias-bearish { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
         .bias-neutral { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
         .bias-direction { font-size: 28px; font-weight: 800; }
         .bias-sub { font-size: 11px; opacity: 0.9; margin-top: 4px; }
-        .bias-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; margin-top: 8px; }
-        .badge-interim { background: rgba(255,255,255,0.2); }
-        .badge-confirmed { background: rgba(255,255,255,0.3); }
+        .bias-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; margin-top: 8px; background: rgba(255,255,255,0.2); }
         
-        /* Signal Cards */
-        .signal { padding: 8px 10px; border-radius: 6px; margin-bottom: 5px; font-size: 11px; }
-        .signal-bull { background: #f0fdf4; border-left: 3px solid #22c55e; }
-        .signal-bear { background: #fef2f2; border-left: 3px solid #ef4444; }
-        .signal-neutral { background: #fffbeb; border-left: 3px solid #f59e0b; }
-        .signal-title { font-weight: 700; margin-bottom: 2px; }
-        .signal-detail { color: #64748b; font-size: 9px; }
-        
-        /* Trading Windows */
         .window-card { border-radius: 12px; padding: 14px; margin-bottom: 10px; color: white; }
         .window-london { background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); }
         .window-ny { background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); }
@@ -216,13 +175,8 @@
         .window-section { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
         .window-section-title { font-size: 10px; font-weight: 700; margin-bottom: 6px; opacity: 0.9; }
         
-        .timeline-item { background: rgba(255,255,255,0.08); border-radius: 6px; padding: 8px; margin-bottom: 5px; font-size: 10px; }
-        .timeline-item.best { background: rgba(34,197,94,0.25); border: 1px solid rgba(34,197,94,0.4); }
-        .timeline-item.avoid { background: rgba(239,68,68,0.25); border: 1px solid rgba(239,68,68,0.4); }
-        .timeline-time { font-weight: 700; margin-bottom: 2px; }
-        
         .liq-row { display: flex; gap: 6px; }
-        .liq-box { flex: 1; padding: 10px; border-radius: 8px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .liq-box { flex: 1; padding: 10px; border-radius: 8px; text-align: center; cursor: pointer; }
         .liq-box.high { background: rgba(239,68,68,0.15); border: 2px solid rgba(239,68,68,0.3); }
         .liq-box.high.swept { background: rgba(239,68,68,0.35); border-color: #ef4444; }
         .liq-box.low { background: rgba(34,197,94,0.15); border: 2px solid rgba(34,197,94,0.3); }
@@ -231,33 +185,16 @@
         .liq-value { font-size: 12px; font-weight: 700; margin: 3px 0; }
         .liq-status { font-size: 8px; font-weight: 700; }
         
-        /* Interim Bias Display */
-        .interim-bias-card {
-            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
-            border-radius: 10px; padding: 12px; margin-bottom: 10px; color: white;
-        }
+        .interim-bias-card { background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); border-radius: 10px; padding: 12px; margin-bottom: 10px; color: white; }
         .interim-bias-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .interim-bias-title { font-size: 12px; font-weight: 700; }
         .interim-badge { background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 10px; font-size: 9px; }
         .interim-direction { font-size: 20px; font-weight: 800; text-align: center; padding: 10px; }
-        .interim-details { font-size: 10px; opacity: 0.9; }
+        .interim-details { font-size: 10px; opacity: 0.9; text-align: center; }
         
-        /* Log Price */
         .log-price-section { background: rgba(255,255,255,0.1); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
         .log-price-title { font-size: 10px; font-weight: 700; margin-bottom: 6px; }
-        .log-price-help { font-size: 9px; opacity: 0.8; margin-bottom: 8px; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 4px; }
         
-        /* Trade Type Toggle */
-        .trade-type-toggle {
-            display: flex; gap: 6px; padding: 4px; background: #f1f5f9; border-radius: 8px; margin-bottom: 10px;
-        }
-        .trade-type-btn {
-            flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 11px;
-            font-weight: 600; cursor: pointer; background: transparent; color: #64748b;
-        }
-        .trade-type-btn.active { background: white; color: #1e293b; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        
-        /* Checklist */
         .check-section { border-radius: 8px; padding: 10px; margin-bottom: 6px; }
         .check-setup { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); }
         .check-trap { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); }
@@ -265,20 +202,12 @@
         .check-entry { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); }
         .check-risk { background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); }
         .check-title { font-size: 10px; font-weight: 700; margin-bottom: 6px; }
-        .check-item { 
-            display: flex; align-items: center; gap: 6px; padding: 6px 8px;
-            background: rgba(255,255,255,0.6); border-radius: 5px; margin-bottom: 3px;
-            cursor: pointer; font-size: 10px; border: 2px solid transparent;
-        }
+        .check-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: rgba(255,255,255,0.6); border-radius: 5px; margin-bottom: 3px; cursor: pointer; font-size: 10px; border: 2px solid transparent; }
         .check-item.checked { background: white; border-color: #22c55e; }
-        .check-box { 
-            width: 16px; height: 16px; border: 2px solid #cbd5e1; border-radius: 3px;
-            display: flex; align-items: center; justify-content: center; background: white; flex-shrink: 0;
-        }
+        .check-box { width: 16px; height: 16px; border: 2px solid #cbd5e1; border-radius: 3px; display: flex; align-items: center; justify-content: center; background: white; flex-shrink: 0; }
         .check-item.checked .check-box { background: #22c55e; border-color: #22c55e; }
         .check-mark { color: white; font-size: 10px; }
         
-        /* Grade */
         .grade-box { text-align: center; padding: 16px; border-radius: 12px; color: white; margin: 10px 0; }
         .grade-aplus { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
         .grade-a { background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%); }
@@ -287,7 +216,6 @@
         .grade-letter { font-size: 42px; font-weight: 800; }
         .grade-label { font-size: 11px; opacity: 0.9; }
         
-        /* Stats */
         .stat-card { background: #f8fafc; border-radius: 10px; padding: 14px; margin-bottom: 10px; }
         .stat-card-title { font-size: 12px; font-weight: 700; margin-bottom: 10px; color: #1e293b; }
         .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
@@ -297,29 +225,16 @@
         .stat-value.red { color: #ef4444; }
         .stat-value.orange { color: #f59e0b; }
         
-        /* History */
-        .history-item { 
-            background: white; border-radius: 8px; padding: 10px; margin-bottom: 6px;
-            border: 1px solid #e2e8f0; position: relative;
-        }
+        .history-item { background: white; border-radius: 8px; padding: 10px; margin-bottom: 6px; border: 1px solid #e2e8f0; }
         .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .history-date { font-weight: 700; font-size: 12px; cursor: pointer; }
         .history-badge { padding: 2px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; }
         .badge-bull { background: #dcfce7; color: #166534; }
         .badge-bear { background: #fee2e2; color: #991b1b; }
         .history-actions { display: flex; gap: 4px; margin-top: 6px; }
-        .history-delete { 
-            background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
-            padding: 4px 8px; border-radius: 4px; font-size: 9px; cursor: pointer;
-        }
-        .history-delete:hover { background: #fee2e2; }
+        .history-delete { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: 4px 8px; border-radius: 4px; font-size: 9px; cursor: pointer; }
         
-        /* Toast */
-        .toast { 
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            background: #1e293b; color: white; padding: 10px 18px; border-radius: 10px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.3); z-index: 1000; display: none; font-size: 12px;
-        }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 10px 18px; border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.3); z-index: 1000; display: none; font-size: 12px; }
         .toast.show { display: block; animation: slideUp 0.3s ease; }
         @keyframes slideUp { from{transform:translateX(-50%) translateY(20px);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
         
@@ -332,7 +247,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <div class="header-left">
                 <h1>🎯 Smart Bias Analyzer</h1>
@@ -340,17 +254,15 @@
             </div>
             <div class="sync-badge local" id="syncBadge" onclick="toggleSyncPanel()">
                 <div class="sync-dot local" id="syncDot"></div>
-                <span id="syncText">Local</span>
+                <span id="syncText">Checking...</span>
             </div>
         </div>
 
-        <!-- Sync Status Bar (visible when synced) -->
         <div class="sync-status-bar local" id="syncStatusBar">
-            <span>💾 <span id="syncStatusText">Local storage only</span></span>
+            <span>💾 <span id="syncStatusText">Checking storage...</span></span>
             <span class="sync-time" id="lastSyncTime">--</span>
         </div>
 
-        <!-- Storage Panel -->
         <div class="storage-panel" id="syncPanel">
             <div class="storage-panel-header">
                 <span style="font-weight:700">💾 Storage & Sync</span>
@@ -360,12 +272,9 @@
                 <button class="storage-tab active" onclick="showStorageTab('status')">📊 Status</button>
                 <button class="storage-tab" onclick="showStorageTab('log')">📋 Log</button>
                 <button class="storage-tab" onclick="showStorageTab('details')">⚙️ Details</button>
-                <button class="storage-tab" onclick="showStorageTab('gdrive')">☁️ Drive</button>
             </div>
             <div class="storage-content" id="storageTabStatus">
-                <div id="syncStatusAlert" class="alert alert-info" style="color:white;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.3)">
-                    ⚠️ Sync on save, NOT real-time across devices
-                </div>
+                <div id="syncStatusAlert" class="alert alert-info" style="color:white;background:rgba(59,130,246,0.2);border:1px solid rgba(59,130,246,0.3)">Checking...</div>
                 <div class="storage-stats">
                     <div class="storage-stat"><div class="storage-stat-value" id="statDays">0</div><div class="storage-stat-label">Days</div></div>
                     <div class="storage-stat"><div class="storage-stat-value" id="statAccuracy">--%</div><div class="storage-stat-label">Accuracy</div></div>
@@ -385,32 +294,9 @@
                 <div class="storage-detail-row"><span style="opacity:0.7">Network</span><span id="detailNetwork">--</span></div>
                 <div class="storage-detail-row"><span style="opacity:0.7">GBPUSD Days</span><span id="detailGU">0</span></div>
                 <div class="storage-detail-row"><span style="opacity:0.7">GBPJPY Days</span><span id="detailGJ">0</span></div>
-                <div class="storage-detail-row"><span style="opacity:0.7">Data Size</span><span id="detailSize">0 KB</span></div>
-            </div>
-            <div class="storage-content hidden" id="storageTabGdrive">
-                <div id="gdriveNotConnected">
-                    <p style="font-size:11px;opacity:0.7;margin-bottom:10px">Connect Google Drive for cross-device sync</p>
-                    <div style="margin-bottom:10px">
-                        <label class="label" style="color:rgba(255,255,255,0.7)">Client ID</label>
-                        <input type="text" class="input" id="gdriveClientId" placeholder="Your Google Client ID" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:white;font-size:11px">
-                    </div>
-                    <button class="btn btn-primary btn-sm" style="width:100%" onclick="saveGDriveConfig();initGoogleAuth()">🔗 Connect</button>
-                </div>
-                <div id="gdriveConnected" class="hidden">
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px;background:rgba(34,197,94,0.2);border-radius:8px">
-                        <img id="gdrivePhoto" src="" style="width:32px;height:32px;border-radius:50%">
-                        <div><div style="font-weight:600;font-size:11px" id="gdriveName">User</div><div style="font-size:9px;opacity:0.7" id="gdriveEmail">email</div></div>
-                    </div>
-                    <div class="grid grid-2" style="gap:6px">
-                        <button class="btn btn-sm btn-green" onclick="uploadToGDrive()">⬆️ Upload</button>
-                        <button class="btn btn-sm btn-primary" onclick="downloadFromGDrive()">⬇️ Download</button>
-                    </div>
-                    <button class="btn btn-sm btn-outline-white" style="width:100%;margin-top:8px" onclick="signOutGDrive()">Sign Out</button>
-                </div>
             </div>
         </div>
 
-        <!-- Tabs -->
         <div class="tabs">
             <button class="tab active" onclick="showTab('analyze')">📊 Bias</button>
             <button class="tab" onclick="showTab('london')">🇬🇧 Lon</button>
@@ -420,42 +306,21 @@
             <button class="tab" onclick="showTab('history')">📅 Hist</button>
         </div>
 
-        <!-- ANALYZE TAB -->
         <div id="tab-analyze">
-            <!-- Mode Toggle -->
             <div class="mode-toggle">
                 <div class="mode-toggle-label">📍 Mode</div>
                 <button class="mode-btn live" id="modeBtn" onclick="toggleMode()">🔴 Live</button>
             </div>
             
-            <!-- Backfill Section - Fixed z-index -->
             <div class="backfill-section hidden" id="backfillSection">
                 <div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#7c3aed">📚 Backfill Mode</div>
                 <div class="grid grid-3">
-                    <div>
-                        <label class="label">Date</label>
-                        <input type="date" class="input" id="backfillDate" onchange="loadDay()">
-                    </div>
-                    <div>
-                        <label class="label">Pair</label>
-                        <select class="input" id="backfillPair" onchange="loadDay()">
-                            <option value="GBPUSD">GBP/USD</option>
-                            <option value="GBPJPY">GBP/JPY</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="label">Session</label>
-                        <select class="input" id="backfillSession">
-                            <option value="asia">Asia</option>
-                            <option value="london">London</option>
-                            <option value="newyork">NY</option>
-                        </select>
-                    </div>
+                    <div><label class="label">Date</label><input type="date" class="input" id="backfillDate" onchange="loadDay()"></div>
+                    <div><label class="label">Pair</label><select class="input" id="backfillPair" onchange="loadDay()"><option value="GBPUSD">GBP/USD</option><option value="GBPJPY">GBP/JPY</option></select></div>
+                    <div><label class="label">Session</label><select class="input" id="backfillSession"><option value="asia">Asia</option><option value="london">London</option><option value="newyork">NY</option></select></div>
                 </div>
-                <p style="font-size:9px;color:#64748b;margin-top:6px">📊 Checklist saves in both modes</p>
             </div>
 
-            <!-- Live Mode Date & Pair -->
             <div class="card" id="liveDateCard">
                 <div class="card-title">📅 Trading Day</div>
                 <div class="grid grid-2">
@@ -466,7 +331,6 @@
 
             <div id="warnings"></div>
 
-            <!-- Key Levels -->
             <div class="session-card session-key">
                 <div class="session-header"><div class="session-title">🔑 Key Levels</div><span class="session-status status-pending" id="keyStatus">Pending</span></div>
                 <div class="grid grid-2" style="margin-bottom:5px">
@@ -480,7 +344,6 @@
                 </div>
             </div>
 
-            <!-- Asia Session -->
             <div class="session-card session-asia">
                 <div class="session-header"><div class="session-title">🌏 Asia (6AM-3PM)</div><span class="session-status status-pending" id="asiaStatus">⏰ 3PM</span></div>
                 <div class="grid grid-4">
@@ -490,153 +353,111 @@
                     <div><label class="label">Close</label><input type="number" step="0.00001" class="input" id="asiaC" onchange="saveDay()"></div>
                 </div>
                 <div class="session-outcome">
-                    <div class="session-outcome-title">📈 Asia Actual Direction (for ML)</div>
+                    <div class="session-outcome-title">📈 Asia Actual Direction</div>
                     <div class="grid grid-3"><button class="btn btn-sm btn-green" onclick="recordSessionOutcome('asia','bullish')">📈 Bull</button><button class="btn btn-sm" onclick="recordSessionOutcome('asia','neutral')">➡️ Flat</button><button class="btn btn-sm btn-red" onclick="recordSessionOutcome('asia','bearish')">📉 Bear</button></div>
                     <div id="asiaOutcomeStatus"></div>
                 </div>
             </div>
 
-            <!-- London Session -->
             <div class="session-card session-london">
                 <div class="session-header"><div class="session-title">🇬🇧 London (3PM-12AM)</div><span class="session-status status-pending" id="londonStatus">⏰ 7PM</span></div>
                 <div class="grid grid-4">
                     <div><label class="label">Open</label><input type="number" step="0.00001" class="input" id="londonO" onchange="saveDay()"></div>
                     <div><label class="label">High</label><input type="number" step="0.00001" class="input" id="londonH" onchange="saveDay()"></div>
                     <div><label class="label">Low</label><input type="number" step="0.00001" class="input" id="londonL" onchange="saveDay()"></div>
-                    <div><label class="label">Close (7PM)</label><input type="number" step="0.00001" class="input" id="londonC" onchange="saveDay()"></div>
+                    <div><label class="label">Close</label><input type="number" step="0.00001" class="input" id="londonC" onchange="saveDay()"></div>
                 </div>
                 <div class="session-outcome">
-                    <div class="session-outcome-title">📈 London Actual Direction (vs Predicted)</div>
+                    <div class="session-outcome-title">📈 London Actual Direction</div>
                     <div class="grid grid-3"><button class="btn btn-sm btn-green" onclick="recordSessionOutcome('london','bullish')">📈 Bull</button><button class="btn btn-sm" onclick="recordSessionOutcome('london','neutral')">➡️ Flat</button><button class="btn btn-sm btn-red" onclick="recordSessionOutcome('london','bearish')">📉 Bear</button></div>
                     <div id="londonOutcomeStatus"></div>
                 </div>
             </div>
 
-            <!-- NY Session -->
             <div class="session-card session-ny">
                 <div class="session-header"><div class="session-title">🇺🇸 NY Overlap (8PM-12AM)</div><span class="session-status status-pending" id="nyStatus">⏰ 10PM</span></div>
                 <div class="grid grid-4">
                     <div><label class="label">Open</label><input type="number" step="0.00001" class="input" id="nyO" onchange="saveDay()"></div>
                     <div><label class="label">High</label><input type="number" step="0.00001" class="input" id="nyH" onchange="saveDay()"></div>
                     <div><label class="label">Low</label><input type="number" step="0.00001" class="input" id="nyL" onchange="saveDay()"></div>
-                    <div><label class="label">Close (10PM)</label><input type="number" step="0.00001" class="input" id="nyC" onchange="saveDay()"></div>
+                    <div><label class="label">Close</label><input type="number" step="0.00001" class="input" id="nyC" onchange="saveDay()"></div>
                 </div>
                 <div class="session-outcome">
-                    <div class="session-outcome-title">📈 NY Actual Direction (Reversal Check)</div>
+                    <div class="session-outcome-title">📈 NY Actual Direction</div>
                     <div class="grid grid-3"><button class="btn btn-sm btn-green" onclick="recordSessionOutcome('ny','bullish')">📈 Bull</button><button class="btn btn-sm" onclick="recordSessionOutcome('ny','neutral')">➡️ Flat</button><button class="btn btn-sm btn-red" onclick="recordSessionOutcome('ny','bearish')">📉 Bear</button></div>
                     <div id="nyOutcomeStatus"></div>
                 </div>
             </div>
 
             <div class="grid grid-2">
-                <button class="btn btn-purple" onclick="calculateInterimBias()">⚡ Interim Bias (Logs)</button>
-                <button class="btn btn-primary" onclick="analyzeBias()">🧠 Full Bias (OHLC)</button>
+                <button class="btn btn-purple" onclick="calculateInterimBias()">⚡ Interim Bias</button>
+                <button class="btn btn-primary" onclick="analyzeBias()">🧠 Full Bias</button>
             </div>
-            <p style="font-size:9px;color:#64748b;text-align:center;margin-top:6px">⚡ Interim = Uses price logs during session | 🧠 Full = Requires complete OHLC</p>
-
             <div id="biasResult"></div>
         </div>
 
-        <!-- LONDON TAB -->
         <div id="tab-london" class="hidden">
-            <!-- Interim Bias Card -->
-            <div class="interim-bias-card" id="londonInterimBias">
-                <div class="interim-bias-header">
-                    <div class="interim-bias-title">⚡ London Interim Bias</div>
-                    <div class="interim-badge">LIVE</div>
-                </div>
+            <div class="interim-bias-card">
+                <div class="interim-bias-header"><div class="interim-bias-title">⚡ London Interim Bias</div><div class="interim-badge">LIVE</div></div>
                 <div class="interim-direction" id="londonInterimDirection">Awaiting data...</div>
-                <div class="interim-details" id="londonInterimDetails">Log prices to calculate real-time bias</div>
+                <div class="interim-details" id="londonInterimDetails">Log prices to calculate</div>
             </div>
-
             <div class="window-card window-london">
                 <div class="window-header"><div class="window-title">🇬🇧 London Session</div><div class="window-time">3:00 - 7:00 PM</div></div>
                 <div class="window-section">
-                    <div class="window-section-title">📋 Timeline</div>
-                    <div class="timeline-item"><div class="timeline-time">3:00 PM</div>London Open</div>
-                    <div class="timeline-item"><div class="timeline-time">3:00-3:30</div>⚠️ Initial sweep - often FAKE</div>
-                    <div class="timeline-item best"><div class="timeline-time">🎯 3:30-4:30</div>TRUE direction emerges</div>
-                    <div class="timeline-item"><div class="timeline-time">5:00-7:00</div>Trend or range</div>
-                </div>
-                <div class="window-section">
-                    <div class="window-section-title">💧 Liquidity (tap when swept)</div>
+                    <div class="window-section-title">💧 Liquidity</div>
                     <div class="liq-row">
                         <div class="liq-box high" id="lonHighBox" onclick="toggleLiq('lon','high')"><div class="liq-label">ASIA HIGH</div><div class="liq-value" id="lonHighVal">--</div><div class="liq-status" id="lonHighStatus">⬜ Not Swept</div></div>
                         <div class="liq-box low" id="lonLowBox" onclick="toggleLiq('lon','low')"><div class="liq-label">ASIA LOW</div><div class="liq-value" id="lonLowVal">--</div><div class="liq-status" id="lonLowStatus">⬜ Not Swept</div></div>
                     </div>
                 </div>
                 <div class="log-price-section">
-                    <div class="log-price-title">📊 Log 15M Close Price</div>
-                    <div class="log-price-help">💡 Logs update INTERIM bias in real-time!</div>
+                    <div class="log-price-title">📊 Log 15M Close</div>
                     <div class="grid grid-2" style="margin-bottom:6px">
-                        <select class="input" id="lonTime" style="color:#333;font-size:11px"><option value="15:30">3:30 PM</option><option value="16:00">4:00 PM</option><option value="16:30">4:30 PM</option><option value="17:00">5:00 PM</option><option value="18:00">6:00 PM</option><option value="19:00">7:00 PM</option></select>
-                        <input type="number" step="0.00001" class="input" id="lonPrice" placeholder="15M Close" style="color:#333;font-size:12px">
+                        <select class="input" id="lonTime" style="color:#333;font-size:11px"><option value="15:30">3:30</option><option value="16:00">4:00</option><option value="16:30">4:30</option><option value="17:00">5:00</option><option value="18:00">6:00</option><option value="19:00">7:00</option></select>
+                        <input type="number" step="0.00001" class="input" id="lonPrice" placeholder="Price" style="color:#333;font-size:12px">
                     </div>
-                    <button class="btn" style="width:100%;background:rgba(255,255,255,0.15);color:white;font-size:11px" onclick="logPrice('lon')">📝 Log & Update Bias</button>
+                    <button class="btn" style="width:100%;background:rgba(255,255,255,0.15);color:white;font-size:11px" onclick="logPrice('lon')">📝 Log</button>
                 </div>
             </div>
             <div id="lonPriceLog"></div>
         </div>
 
-        <!-- NY TAB -->
         <div id="tab-ny" class="hidden">
-            <!-- Interim Bias Card -->
-            <div class="interim-bias-card" id="nyInterimBias" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);">
-                <div class="interim-bias-header">
-                    <div class="interim-bias-title">⚡ NY Interim Bias</div>
-                    <div class="interim-badge">LIVE</div>
-                </div>
+            <div class="interim-bias-card" style="background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%)">
+                <div class="interim-bias-header"><div class="interim-bias-title">⚡ NY Interim Bias</div><div class="interim-badge">LIVE</div></div>
                 <div class="interim-direction" id="nyInterimDirection">Awaiting data...</div>
-                <div class="interim-details" id="nyInterimDetails">Log prices to calculate real-time bias</div>
+                <div class="interim-details" id="nyInterimDetails">Log prices to calculate</div>
             </div>
-
             <div class="window-card window-ny">
                 <div class="window-header"><div class="window-title">🇺🇸 NY Overlap</div><div class="window-time">8:00 PM - 12:00 AM</div></div>
                 <div class="window-section">
-                    <div class="window-section-title">📋 Timeline</div>
-                    <div class="timeline-item"><div class="timeline-time">8:00 PM</div>NY Open</div>
-                    <div class="timeline-item best"><div class="timeline-time">🎯 8:30-10:00</div>BEST WINDOW</div>
-                    <div class="timeline-item"><div class="timeline-time">10:00-11:00</div>⚠️ Reversal watch</div>
-                    <div class="timeline-item avoid"><div class="timeline-time">❌ 11:00+</div>AVOID!</div>
-                </div>
-                <div class="window-section">
-                    <div class="window-section-title">💧 Liquidity (tap when swept)</div>
+                    <div class="window-section-title">💧 Liquidity</div>
                     <div class="liq-row">
-                        <div class="liq-box high" id="nyHighBox" onclick="toggleLiq('ny','high')"><div class="liq-label">LONDON HIGH</div><div class="liq-value" id="nyHighVal">--</div><div class="liq-status" id="nyHighStatus">⬜ Not Swept</div></div>
-                        <div class="liq-box low" id="nyLowBox" onclick="toggleLiq('ny','low')"><div class="liq-label">LONDON LOW</div><div class="liq-value" id="nyLowVal">--</div><div class="liq-status" id="nyLowStatus">⬜ Not Swept</div></div>
+                        <div class="liq-box high" id="nyHighBox" onclick="toggleLiq('ny','high')"><div class="liq-label">LON HIGH</div><div class="liq-value" id="nyHighVal">--</div><div class="liq-status" id="nyHighStatus">⬜ Not Swept</div></div>
+                        <div class="liq-box low" id="nyLowBox" onclick="toggleLiq('ny','low')"><div class="liq-label">LON LOW</div><div class="liq-value" id="nyLowVal">--</div><div class="liq-status" id="nyLowStatus">⬜ Not Swept</div></div>
                     </div>
                 </div>
                 <div class="log-price-section">
-                    <div class="log-price-title">📊 Log 15M Close Price</div>
-                    <div class="log-price-help">💡 Exit before 11PM!</div>
+                    <div class="log-price-title">📊 Log 15M Close</div>
                     <div class="grid grid-2" style="margin-bottom:6px">
-                        <select class="input" id="nyTime" style="color:#333;font-size:11px"><option value="20:30">8:30 PM</option><option value="21:00">9:00 PM</option><option value="21:30">9:30 PM</option><option value="22:00">10:00 PM</option><option value="22:30">10:30 PM ⚠️</option><option value="23:00">11:00 PM ❌</option></select>
-                        <input type="number" step="0.00001" class="input" id="nyPrice" placeholder="15M Close" style="color:#333;font-size:12px">
+                        <select class="input" id="nyTime" style="color:#333;font-size:11px"><option value="20:30">8:30</option><option value="21:00">9:00</option><option value="21:30">9:30</option><option value="22:00">10:00</option><option value="22:30">10:30⚠️</option><option value="23:00">11:00❌</option></select>
+                        <input type="number" step="0.00001" class="input" id="nyPrice" placeholder="Price" style="color:#333;font-size:12px">
                     </div>
-                    <button class="btn" style="width:100%;background:rgba(255,255,255,0.15);color:white;font-size:11px" onclick="logPrice('ny')">📝 Log & Update Bias</button>
+                    <button class="btn" style="width:100%;background:rgba(255,255,255,0.15);color:white;font-size:11px" onclick="logPrice('ny')">📝 Log</button>
                 </div>
             </div>
             <div id="nyPriceLog"></div>
         </div>
 
-        <!-- CHECKLIST TAB -->
         <div id="tab-checklist" class="hidden">
             <div class="card">
                 <div class="card-title">✅ A+ Setup Checklist</div>
-                <div class="trade-type-toggle">
-                    <button class="trade-type-btn active" id="typeIntraday" onclick="setTradeType('intraday')">⚡ Intraday</button>
-                    <button class="trade-type-btn" id="typeSwing" onclick="setTradeType('swing')">📅 Swing (Soon)</button>
-                </div>
-                <div id="intradayChecklist">
-                    <div class="check-section check-setup"><div class="check-title">📊 PHASE 1: Setup</div><div id="checkSetup"></div></div>
-                    <div class="check-section check-trap"><div class="check-title">🪤 PHASE 2: Trap</div><div id="checkTrap"></div></div>
-                    <div class="check-section check-trigger"><div class="check-title">🎯 PHASE 3: Trigger</div><div id="checkTrigger"></div></div>
-                    <div class="check-section check-entry"><div class="check-title">⚡ PHASE 4: Entry</div><div id="checkEntry"></div></div>
-                    <div class="check-section check-risk"><div class="check-title">🛡️ PHASE 5: Risk</div><div id="checkRisk"></div></div>
-                </div>
-                <div id="swingChecklist" class="hidden">
-                    <div class="alert alert-info">📅 Swing checklist coming soon! Weekly zones, Daily bias, Multi-day targets.</div>
-                </div>
+                <div class="check-section check-setup"><div class="check-title">📊 PHASE 1: Setup</div><div id="checkSetup"></div></div>
+                <div class="check-section check-trap"><div class="check-title">🪤 PHASE 2: Trap</div><div id="checkTrap"></div></div>
+                <div class="check-section check-trigger"><div class="check-title">🎯 PHASE 3: Trigger</div><div id="checkTrigger"></div></div>
+                <div class="check-section check-entry"><div class="check-title">⚡ PHASE 4: Entry</div><div id="checkEntry"></div></div>
+                <div class="check-section check-risk"><div class="check-title">🛡️ PHASE 5: Risk</div><div id="checkRisk"></div></div>
             </div>
             <div id="gradeResult"></div>
             <div id="tradeButtons" class="card hidden">
@@ -648,35 +469,24 @@
             </div>
         </div>
 
-        <!-- STATS TAB -->
         <div id="tab-stats" class="hidden">
             <div class="card">
-                <div class="card-title">📈 Performance Overview</div>
+                <div class="card-title">📈 Performance</div>
                 <div class="grid grid-3" style="margin-bottom:12px">
                     <div class="stat-card" style="text-align:center"><div style="font-size:24px;font-weight:700" id="overallWinRate">--%</div><div style="font-size:10px;color:#64748b">Win Rate</div></div>
-                    <div class="stat-card" style="text-align:center"><div style="font-size:24px;font-weight:700" id="totalTrades">0</div><div style="font-size:10px;color:#64748b">Total Trades</div></div>
-                    <div class="stat-card" style="text-align:center"><div style="font-size:24px;font-weight:700" id="biasAccuracy">--%</div><div style="font-size:10px;color:#64748b">Bias Accuracy</div></div>
+                    <div class="stat-card" style="text-align:center"><div style="font-size:24px;font-weight:700" id="totalTrades">0</div><div style="font-size:10px;color:#64748b">Trades</div></div>
+                    <div class="stat-card" style="text-align:center"><div style="font-size:24px;font-weight:700" id="biasAccuracy">--%</div><div style="font-size:10px;color:#64748b">Bias Acc</div></div>
                 </div>
             </div>
             <div class="stat-card">
-                <div class="stat-card-title">🎯 A+ vs B Setup Performance</div>
-                <div class="stat-row"><span>A+ Setups (8/8 critical)</span><span class="stat-value green" id="aplusWinRate">-- (0)</span></div>
-                <div class="stat-row"><span>A Setups (7/8 critical)</span><span class="stat-value" id="aWinRate">-- (0)</span></div>
-                <div class="stat-row"><span>B Setups (5-6 critical)</span><span class="stat-value orange" id="bWinRate">-- (0)</span></div>
-                <div class="stat-row"><span>C Setups (&lt;5 critical)</span><span class="stat-value red" id="cWinRate">-- (0)</span></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-card-title">🤖 ML Patterns Detected</div>
-                <div id="mlPatterns"><p style="font-size:11px;color:#64748b">Need 10+ trades...</p></div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-card-title">📊 Session Performance</div>
-                <div class="stat-row"><span>London Accuracy</span><span class="stat-value" id="londonPerf">--</span></div>
-                <div class="stat-row"><span>NY Reversals</span><span class="stat-value" id="nyReversals">--</span></div>
+                <div class="stat-card-title">🎯 Grade Performance</div>
+                <div class="stat-row"><span>A+ Setups</span><span class="stat-value green" id="aplusWinRate">--</span></div>
+                <div class="stat-row"><span>A Setups</span><span class="stat-value" id="aWinRate">--</span></div>
+                <div class="stat-row"><span>B Setups</span><span class="stat-value orange" id="bWinRate">--</span></div>
+                <div class="stat-row"><span>C Setups</span><span class="stat-value red" id="cWinRate">--</span></div>
             </div>
         </div>
 
-        <!-- HISTORY TAB -->
         <div id="tab-history" class="hidden">
             <div class="card">
                 <div class="card-title">📅 History</div>
@@ -702,57 +512,107 @@
     <div class="toast" id="toast"></div>
 
     <script>
-    var state = { date: new Date().toISOString().split('T')[0], pair: 'GBPUSD', mode: 'live', tradeType: 'intraday', data: {}, checklist: {}, filter: 'all', syncLog: [], lastSync: null };
+    var state = { date: new Date().toISOString().split('T')[0], pair: 'GBPUSD', mode: 'live', data: {}, checklist: {}, filter: 'all', syncLog: [], lastSync: null, cloudAvailable: false };
     var checkItems = {
-        intraday: {
-            setup: [{ key: 'h4Zone', label: '4H Supply/Demand Zone', critical: true },{ key: 'h4Imbalance', label: 'FVG Still Unfilled', critical: true },{ key: 'h1Nested', label: '1H Zone Inside 4H', critical: true },{ key: 'h1FVG', label: '1H FVG Present', critical: false }],
-            trap: [{ key: 'inducementCreated', label: 'Inducement Created', critical: true },{ key: 'priceDrawnAway', label: 'Price Drawn Away', critical: false },{ key: 'inducementUntapped', label: 'Inducement Untapped', critical: false }],
-            trigger: [{ key: 'inducementSwept', label: '🎯 Inducement SWEPT', critical: true },{ key: 'h1BodyClose', label: '1H Body Close Confirm', critical: true },{ key: 'priceReturning', label: 'Price Returning', critical: false },{ key: 'smtDiv', label: 'SMT Divergence', critical: false }],
-            entry: [{ key: 'm5Zone', label: '5M/15M Zone', critical: false },{ key: 'm5Sweep', label: '5M Fake Breakout', critical: true },{ key: 'm5BodyClose', label: '5M Body Close', critical: true },{ key: 'm5Rejection', label: 'Rejection Candle', critical: false }],
-            risk: [{ key: 'notMonday', label: 'Not Monday', critical: false },{ key: 'goodSession', label: 'London/NY Overlap', critical: false },{ key: 'noRevenge', label: 'Not Revenge Trading', critical: false },{ key: 'riskManaged', label: 'Risk ≤1%', critical: false }]
-        }
+        setup: [{ key: 'h4Zone', label: '4H S/D Zone', critical: true },{ key: 'h4Imbalance', label: 'FVG Unfilled', critical: true },{ key: 'h1Nested', label: '1H Inside 4H', critical: true },{ key: 'h1FVG', label: '1H FVG', critical: false }],
+        trap: [{ key: 'inducementCreated', label: 'Inducement Created', critical: true },{ key: 'priceDrawnAway', label: 'Price Drawn Away', critical: false },{ key: 'inducementUntapped', label: 'Inducement Untapped', critical: false }],
+        trigger: [{ key: 'inducementSwept', label: '🎯 Inducement SWEPT', critical: true },{ key: 'h1BodyClose', label: '1H Body Close', critical: true },{ key: 'priceReturning', label: 'Price Returning', critical: false },{ key: 'smtDiv', label: 'SMT Divergence', critical: false }],
+        entry: [{ key: 'm5Zone', label: '5M/15M Zone', critical: false },{ key: 'm5Sweep', label: '5M Fake Breakout', critical: true },{ key: 'm5BodyClose', label: '5M Body Close', critical: true },{ key: 'm5Rejection', label: 'Rejection Candle', critical: false }],
+        risk: [{ key: 'notMonday', label: 'Not Monday', critical: false },{ key: 'goodSession', label: 'London/NY Overlap', critical: false },{ key: 'noRevenge', label: 'Not Revenge', critical: false },{ key: 'riskManaged', label: 'Risk ≤1%', critical: false }]
     };
 
-    function init() {
+    async function init() {
         document.getElementById('selectedDate').value = state.date;
         document.getElementById('backfillDate').value = state.date;
-        loadData(); loadDay(); renderChecklist(); checkWarnings(); updateStats(); updateStorageDetails(); loadGDriveConfig(); updateSyncStatusBar();
-        setTimeout(restoreGDriveSession, 500);
+        await checkCloudStorage();
+        await loadFromCloud();
+        loadDay(); renderChecklist(); checkWarnings(); updateStats(); updateStorageDetails();
         addLog('App v5.3 initialized', 'info');
     }
 
-    function addLog(msg, type) { type = type || 'info'; var time = new Date().toLocaleTimeString().slice(0,5); state.syncLog.unshift({ time: time, msg: msg, type: type }); if (state.syncLog.length > 50) state.syncLog = state.syncLog.slice(0, 50); renderSyncLog(); }
-    function renderSyncLog() { var el = document.getElementById('syncLog'); if (!el) return; el.innerHTML = state.syncLog.length === 0 ? '<div class="sync-log-entry info">Waiting...</div>' : state.syncLog.map(function(e) { return '<div class="sync-log-entry '+e.type+'">['+e.time+'] '+e.msg+'</div>'; }).join(''); }
-    function clearSyncLog() { state.syncLog = []; addLog('Log cleared', 'info'); toast('Log cleared'); }
+    async function checkCloudStorage() {
+        try {
+            if (typeof window.storage !== 'undefined') {
+                await window.storage.get('test');
+                state.cloudAvailable = true;
+                addLog('☁️ Cloud storage AVAILABLE', 'success');
+            } else {
+                state.cloudAvailable = false;
+                addLog('📱 Local storage only', 'warning');
+            }
+        } catch (e) {
+            state.cloudAvailable = false;
+            addLog('Cloud check: ' + e.message, 'error');
+        }
+        updateSyncStatusBar();
+    }
+
+    async function loadFromCloud() {
+        if (!state.cloudAvailable) { loadData(); return; }
+        try {
+            var cloudData = await window.storage.get('bias_v5_all');
+            if (cloudData && cloudData.value) {
+                var parsed = JSON.parse(cloudData.value);
+                if (parsed.GBPUSD) localStorage.setItem('bias_v5_GBPUSD', JSON.stringify(parsed.GBPUSD));
+                if (parsed.GBPJPY) localStorage.setItem('bias_v5_GBPJPY', JSON.stringify(parsed.GBPJPY));
+                addLog('⬇️ Downloaded from cloud', 'success');
+                state.lastSync = new Date().toLocaleTimeString().slice(0,5);
+            }
+        } catch (e) { addLog('Cloud load: ' + e.message, 'error'); }
+        loadData(); updateSyncStatusBar();
+    }
+
+    async function saveToCloud() {
+        if (!state.cloudAvailable) return;
+        try {
+            document.getElementById('syncDot').className = 'sync-dot syncing';
+            var all = {};
+            ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); });
+            await window.storage.set('bias_v5_all', JSON.stringify(all));
+            state.lastSync = new Date().toLocaleTimeString().slice(0,5);
+            addLog('⬆️ Synced to cloud', 'success');
+            document.getElementById('syncDot').className = 'sync-dot synced';
+            updateSyncStatusBar();
+        } catch (e) { addLog('Cloud save: ' + e.message, 'error'); document.getElementById('syncDot').className = 'sync-dot local'; }
+    }
+
+    async function manualSync() {
+        if (!state.cloudAvailable) { toast('⚠️ Cloud not available'); return; }
+        await loadFromCloud(); await saveToCloud(); toast('☁️ Synced!');
+    }
 
     function updateSyncStatusBar() {
         var bar = document.getElementById('syncStatusBar');
         var text = document.getElementById('syncStatusText');
         var time = document.getElementById('lastSyncTime');
-        if (gdrive.token) {
-            bar.className = 'sync-status-bar synced';
-            text.textContent = '☁️ Google Drive connected';
-            time.textContent = state.lastSync ? 'Last: ' + state.lastSync : 'Ready';
+        var badge = document.getElementById('syncBadge');
+        var dot = document.getElementById('syncDot');
+        var badgeText = document.getElementById('syncText');
+        var alert = document.getElementById('syncStatusAlert');
+        if (state.cloudAvailable) {
+            bar.className = 'sync-status-bar synced'; text.textContent = '☁️ Cloud sync active'; time.textContent = state.lastSync ? 'Last: ' + state.lastSync : 'Ready';
+            badge.className = 'sync-badge synced'; dot.className = 'sync-dot synced'; badgeText.textContent = '☁️ Synced';
+            alert.innerHTML = '✅ Cloud sync active!'; alert.style.background = 'rgba(34,197,94,0.2)';
         } else {
-            bar.className = 'sync-status-bar local';
-            text.textContent = '💾 Local storage only';
-            time.textContent = 'Not synced';
+            bar.className = 'sync-status-bar local'; text.textContent = '📱 Local only'; time.textContent = 'Not synced';
+            badge.className = 'sync-badge local'; dot.className = 'sync-dot local'; badgeText.textContent = 'Local';
+            alert.innerHTML = '⚠️ Local only. Cloud not available.'; alert.style.background = 'rgba(245,158,11,0.2)';
         }
     }
+
+    function addLog(msg, type) { type = type || 'info'; var time = new Date().toLocaleTimeString().slice(0,5); state.syncLog.unshift({ time: time, msg: msg, type: type }); if (state.syncLog.length > 50) state.syncLog = state.syncLog.slice(0, 50); renderSyncLog(); }
+    function renderSyncLog() { var el = document.getElementById('syncLog'); el.innerHTML = state.syncLog.length === 0 ? '<div class="sync-log-entry info">Waiting...</div>' : state.syncLog.map(function(e) { return '<div class="sync-log-entry '+e.type+'">['+e.time+'] '+e.msg+'</div>'; }).join(''); }
+    function clearSyncLog() { state.syncLog = []; addLog('Log cleared', 'info'); toast('Log cleared'); }
 
     function toggleMode() {
         state.mode = state.mode === 'live' ? 'backfill' : 'live';
         var btn = document.getElementById('modeBtn');
         if (state.mode === 'backfill') { btn.textContent = '📚 Backfill'; btn.className = 'mode-btn backfill'; document.getElementById('backfillSection').classList.remove('hidden'); document.getElementById('liveDateCard').classList.add('hidden'); document.getElementById('backfillPair').value = state.pair; }
         else { btn.textContent = '🔴 Live'; btn.className = 'mode-btn live'; document.getElementById('backfillSection').classList.add('hidden'); document.getElementById('liveDateCard').classList.remove('hidden'); document.getElementById('selectedDate').value = new Date().toISOString().split('T')[0]; loadDay(); }
-        addLog('Mode: ' + state.mode, 'info');
     }
 
-    function setTradeType(type) { state.tradeType = type; document.getElementById('typeIntraday').classList.toggle('active', type === 'intraday'); document.getElementById('typeSwing').classList.toggle('active', type === 'swing'); document.getElementById('intradayChecklist').classList.toggle('hidden', type !== 'intraday'); document.getElementById('swingChecklist').classList.toggle('hidden', type !== 'swing'); }
-
     function loadData() { var saved = localStorage.getItem('bias_v5_' + state.pair); state.data = saved ? JSON.parse(saved) : {}; }
-    function saveData() { localStorage.setItem('bias_v5_' + state.pair, JSON.stringify(state.data)); updateStats(); updateStorageDetails(); autoSync(); }
-    function pf(v) { var n = parseFloat(v); return isNaN(n) ? null : n; }
+    function saveData() { localStorage.setItem('bias_v5_' + state.pair, JSON.stringify(state.data)); updateStats(); updateStorageDetails(); saveToCloud(); }
 
     function loadDay() {
         state.date = state.mode === 'backfill' ? document.getElementById('backfillDate').value : document.getElementById('selectedDate').value;
@@ -780,39 +640,26 @@
         d.asia = { o: gv('asiaO'), h: gv('asiaH'), l: gv('asiaL'), c: gv('asiaC') };
         d.london = { o: gv('londonO'), h: gv('londonH'), l: gv('londonL'), c: gv('londonC') };
         d.ny = { o: gv('nyO'), h: gv('nyH'), l: gv('nyL'), c: gv('nyC') };
-        d.checklist = state.checklist; d.tradeType = state.tradeType; d.mode = state.mode; d.updatedAt = new Date().toISOString();
+        d.checklist = state.checklist; d.updatedAt = new Date().toISOString();
         saveData(); updateStatusBadges(); toast('💾 Saved');
     }
 
     function gv(id) { var el = document.getElementById(id); var v = el ? parseFloat(el.value) : null; if (el && el.value) el.classList.add('filled'); return isNaN(v) ? null : v; }
-    function updateStatusBadges() { var d = state.data[state.date]; var keyOk = d && d.key && d.key.weekH && d.key.weekL && d.key.prevH && d.key.prevL && d.key.prevC; var asiaOk = d && d.asia && d.asia.o && d.asia.h && d.asia.l && d.asia.c; var lonOk = d && d.london && d.london.o && d.london.h && d.london.l && d.london.c; var nyOk = d && d.ny && d.ny.o && d.ny.h && d.ny.l && d.ny.c; setBadge('keyStatus', keyOk); setBadge('asiaStatus', asiaOk, '⏰ 3PM'); setBadge('londonStatus', lonOk, '⏰ 7PM'); setBadge('nyStatus', nyOk, '⏰ 10PM'); }
+    function updateStatusBadges() { var d = state.data[state.date]; var keyOk = d && d.key && d.key.weekH && d.key.weekL; var asiaOk = d && d.asia && d.asia.o && d.asia.h && d.asia.l && d.asia.c; var lonOk = d && d.london && d.london.o && d.london.h && d.london.l && d.london.c; var nyOk = d && d.ny && d.ny.o && d.ny.h && d.ny.l && d.ny.c; setBadge('keyStatus', keyOk); setBadge('asiaStatus', asiaOk, '⏰ 3PM'); setBadge('londonStatus', lonOk, '⏰ 7PM'); setBadge('nyStatus', nyOk, '⏰ 10PM'); }
     function setBadge(id, ok, pending) { var el = document.getElementById(id); if (ok) { el.textContent = '✅'; el.className = 'session-status status-complete'; } else { el.textContent = pending || 'Pending'; el.className = 'session-status status-pending'; } }
-    function updateSessionOutcomeDisplay(session, day) { var statusEl = document.getElementById(session + 'OutcomeStatus'); if (day.outcomes && day.outcomes[session]) { var actual = day.outcomes[session]; var predicted = day.predicted; var isCorrect = predicted && predicted.toLowerCase() === actual.toLowerCase(); statusEl.innerHTML = '<div class="outcome-recorded '+(isCorrect?'':'wrong')+'">'+(isCorrect?'✅':'❌')+' '+actual+'</div>'; } else { statusEl.innerHTML = ''; } }
-    function recordSessionOutcome(session, outcome) { if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; var d = state.data[state.date]; if (!d.outcomes) d.outcomes = {}; d.outcomes[session] = outcome; saveData(); updateSessionOutcomeDisplay(session, d); addLog(session + ': ' + outcome, 'success'); toast('📈 ' + session + ' recorded'); }
+    function updateSessionOutcomeDisplay(session, day) { var statusEl = document.getElementById(session + 'OutcomeStatus'); if (day.outcomes && day.outcomes[session]) { var actual = day.outcomes[session]; statusEl.innerHTML = '<div class="outcome-recorded">✅ '+actual+'</div>'; } else { statusEl.innerHTML = ''; } }
+    function recordSessionOutcome(session, outcome) { if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; var d = state.data[state.date]; if (!d.outcomes) d.outcomes = {}; d.outcomes[session] = outcome; saveData(); updateSessionOutcomeDisplay(session, d); toast('📈 ' + session + ' recorded'); }
 
-    // INTERIM BIAS - Uses price logs during session
     function calculateInterimBias() {
         var d = state.data[state.date];
-        if (!d || !d.asia || !d.asia.h || !d.asia.l) { toast('⚠️ Need Asia OHLC first'); return; }
+        if (!d || !d.asia || !d.asia.h || !d.asia.l) { toast('⚠️ Need Asia OHLC'); return; }
         if (!d.logs || d.logs.length === 0) { toast('⚠️ Log prices first'); return; }
-
         var lonLogs = d.logs.filter(function(l) { return l.session === 'lon'; });
-        if (lonLogs.length === 0) { toast('⚠️ No London price logs'); return; }
-
+        if (lonLogs.length === 0) { toast('⚠️ No London logs'); return; }
         var result = calculateInterimFromLogs(d.asia, lonLogs, d.sweeps || []);
-        d.interimBias = result;
-        saveData();
-
-        var html = '<div class="bias-result ' + (result.bias === 'BULLISH' ? 'bias-bullish' : result.bias === 'BEARISH' ? 'bias-bearish' : 'bias-neutral') + '">';
-        html += '<div class="bias-direction">' + result.bias + '</div>';
-        html += '<div class="bias-sub">Confidence: ' + result.confidence + '%</div>';
-        html += '<div class="bias-badge badge-interim">⚡ INTERIM (from ' + lonLogs.length + ' logs)</div>';
-        html += '</div>';
-        html += '<div class="card"><div class="card-title">📋 Interim Signals</div>';
-        result.signals.forEach(function(s) { html += '<div class="signal signal-' + s.type + '"><div class="signal-title">' + s.title + '</div><div class="signal-detail">' + s.detail + '</div></div>'; });
-        html += '</div>';
+        d.interimBias = result; saveData();
+        var html = '<div class="bias-result ' + (result.bias === 'BULLISH' ? 'bias-bullish' : result.bias === 'BEARISH' ? 'bias-bearish' : 'bias-neutral') + '"><div class="bias-direction">' + result.bias + '</div><div class="bias-sub">Confidence: ' + result.confidence + '%</div><div class="bias-badge">⚡ INTERIM</div></div>';
         document.getElementById('biasResult').innerHTML = html;
-        addLog('Interim Bias: ' + result.bias, 'info');
     }
 
     function calculateInterimFromLogs(asia, logs, sweeps) {
@@ -820,65 +667,54 @@
         var highestLog = Math.max.apply(null, logs.map(function(l) { return l.price; }));
         var lowestLog = Math.min.apply(null, logs.map(function(l) { return l.price; }));
         var asiaMid = (asia.h + asia.l) / 2;
-
-        var bull = 0, bear = 0, signals = [];
+        var bull = 0, bear = 0;
         var sweptHigh = highestLog > asia.h || sweeps.some(function(s) { return s.session === 'lon' && s.level === 'high'; });
         var sweptLow = lowestLog < asia.l || sweeps.some(function(s) { return s.session === 'lon' && s.level === 'low'; });
-
-        if (sweptLow && latestPrice > asiaMid) { bull += 4; signals.push({ type: 'bull', title: '🎯 Swept Low + Above Mid', detail: 'Bearish liquidity grabbed, price rejected up' }); }
-        if (sweptHigh && latestPrice < asiaMid) { bear += 4; signals.push({ type: 'bear', title: '🎯 Swept High + Below Mid', detail: 'Bullish liquidity grabbed, price rejected down' }); }
-        if (sweptHigh && latestPrice > asia.h) { bull += 2; signals.push({ type: 'bull', title: '📈 Bullish Continuation', detail: 'Holding above Asia high' }); }
-        if (sweptLow && latestPrice < asia.l) { bear += 2; signals.push({ type: 'bear', title: '📉 Bearish Continuation', detail: 'Holding below Asia low' }); }
-        if (latestPrice > asiaMid && !sweptHigh && !sweptLow) { bull += 1; signals.push({ type: 'neutral', title: '➡️ Above midpoint', detail: 'No sweep yet' }); }
-        if (latestPrice < asiaMid && !sweptHigh && !sweptLow) { bear += 1; signals.push({ type: 'neutral', title: '➡️ Below midpoint', detail: 'No sweep yet' }); }
-
+        if (sweptLow && latestPrice > asiaMid) bull += 4;
+        if (sweptHigh && latestPrice < asiaMid) bear += 4;
+        if (sweptHigh && latestPrice > asia.h) bull += 2;
+        if (sweptLow && latestPrice < asia.l) bear += 2;
+        if (latestPrice > asiaMid && !sweptHigh && !sweptLow) bull += 1;
+        if (latestPrice < asiaMid && !sweptHigh && !sweptLow) bear += 1;
         var total = bull + bear;
         var bias = bull > bear && bull >= 2 ? 'BULLISH' : bear > bull && bear >= 2 ? 'BEARISH' : 'NEUTRAL';
         var confidence = total > 0 ? Math.round((Math.max(bull, bear) / total) * 100) : 50;
-
-        return { bias: bias, confidence: confidence, signals: signals, latestPrice: latestPrice };
+        return { bias: bias, confidence: confidence, latestPrice: latestPrice };
     }
 
     function updateInterimBias(session) {
         var d = state.data[state.date];
         var dirEl = document.getElementById(session === 'lon' ? 'londonInterimDirection' : 'nyInterimDirection');
         var detailEl = document.getElementById(session === 'lon' ? 'londonInterimDetails' : 'nyInterimDetails');
-
-        if (!d || !d.logs) { dirEl.textContent = 'Awaiting data...'; detailEl.textContent = 'Log prices to calculate'; return; }
-
+        if (!d || !d.logs) { dirEl.textContent = 'Awaiting data...'; return; }
         var prevSession = session === 'lon' ? d.asia : d.london;
-        if (!prevSession || !prevSession.h || !prevSession.l) { dirEl.textContent = 'Need ' + (session === 'lon' ? 'Asia' : 'London') + ' OHLC'; detailEl.textContent = 'Complete previous session first'; return; }
-
+        if (!prevSession || !prevSession.h || !prevSession.l) { dirEl.textContent = 'Need prev session'; return; }
         var logs = d.logs.filter(function(l) { return l.session === session; });
-        if (logs.length === 0) { dirEl.textContent = 'No logs yet'; detailEl.textContent = 'Start logging 15M closes'; return; }
-
+        if (logs.length === 0) { dirEl.textContent = 'No logs yet'; return; }
         var result = calculateInterimFromLogs(prevSession, logs, d.sweeps || []);
         dirEl.innerHTML = result.bias + ' <span style="font-size:14px;opacity:0.8">(' + result.confidence + '%)</span>';
-        detailEl.textContent = 'Latest: ' + result.latestPrice.toFixed(5) + ' | ' + logs.length + ' logs';
+        detailEl.textContent = 'Latest: ' + result.latestPrice.toFixed(5);
     }
 
-    // FULL BIAS - Uses complete OHLC
     function analyzeBias() {
-        var d = state.data[state.date]; if (!d || !d.asia || !d.london) { toast('⚠️ Enter Asia + London data'); return; }
-        var asia = d.asia, lon = d.london, key = d.key; if (!asia.h || !asia.l || !lon.h || !lon.l || !lon.c) { toast('⚠️ Need full OHLC'); return; }
-        var signals = [], bull = 0, bear = 0; var asiaMid = (asia.h + asia.l) / 2; var sweptHigh = lon.h > asia.h, sweptLow = lon.l < asia.l; var closedAboveMid = lon.c > asiaMid, closedBelowMid = lon.c < asiaMid;
-        if (sweptLow && closedAboveMid) { bull += 4; signals.push({ type: 'bull', title: '🎯 Swept Low + Rejected UP', detail: 'Bearish liquidity grabbed' }); }
-        if (sweptHigh && closedBelowMid) { bear += 4; signals.push({ type: 'bear', title: '🎯 Swept High + Rejected DOWN', detail: 'Bullish liquidity grabbed' }); }
-        if (sweptHigh && lon.c > asia.h) { bull += 2; signals.push({ type: 'bull', title: '📈 Bullish Continuation', detail: 'Held above sweep' }); }
-        if (sweptLow && lon.c < asia.l) { bear += 2; signals.push({ type: 'bear', title: '📉 Bearish Continuation', detail: 'Held below sweep' }); }
-        if (!sweptHigh && !sweptLow) { if (lon.c > lon.o) { bull += 1; signals.push({ type: 'neutral', title: '➡️ No Sweep - Up', detail: 'No liquidity taken' }); } else { bear += 1; signals.push({ type: 'neutral', title: '➡️ No Sweep - Down', detail: 'No liquidity taken' }); } }
-        if (key && key.prevC) { if (lon.c > key.prevC) bull += 1; else bear += 1; }
-        var total = bull + bear; var bias, biasClass, conf;
-        if (bull > bear && bull >= 3) { bias = 'BULLISH'; biasClass = 'bias-bullish'; conf = Math.round(bull/total*100); }
-        else if (bear > bull && bear >= 3) { bias = 'BEARISH'; biasClass = 'bias-bearish'; conf = Math.round(bear/total*100); }
-        else { bias = 'NEUTRAL'; biasClass = 'bias-neutral'; conf = 50; }
-        d.predicted = bias; d.biasDetails = { bull: bull, bear: bear, conf: conf, at: new Date().toISOString() }; saveData(); addLog('Bias: ' + bias + ' (' + conf + '%)', 'info');
-        var html = '<div class="bias-result '+biasClass+'"><div class="bias-direction">'+bias+'</div><div class="bias-sub">Confidence: '+conf+'%</div><div class="bias-badge badge-confirmed">✅ CONFIRMED (Full OHLC)</div></div>';
-        html += '<div class="card"><div class="card-title">📋 Signals</div>'; signals.forEach(function(s) { html += '<div class="signal signal-'+s.type+'"><div class="signal-title">'+s.title+'</div><div class="signal-detail">'+s.detail+'</div></div>'; }); html += '</div>';
+        var d = state.data[state.date]; if (!d || !d.asia || !d.london) { toast('⚠️ Enter Asia + London'); return; }
+        var asia = d.asia, lon = d.london; if (!asia.h || !asia.l || !lon.h || !lon.l || !lon.c) { toast('⚠️ Need full OHLC'); return; }
+        var bull = 0, bear = 0; var asiaMid = (asia.h + asia.l) / 2;
+        if (lon.l < asia.l && lon.c > asiaMid) bull += 4;
+        if (lon.h > asia.h && lon.c < asiaMid) bear += 4;
+        if (lon.h > asia.h && lon.c > asia.h) bull += 2;
+        if (lon.l < asia.l && lon.c < asia.l) bear += 2;
+        if (lon.c > lon.o) bull += 1; else bear += 1;
+        var total = bull + bear; var bias, conf;
+        if (bull > bear && bull >= 3) { bias = 'BULLISH'; conf = Math.round(bull/total*100); }
+        else if (bear > bull && bear >= 3) { bias = 'BEARISH'; conf = Math.round(bear/total*100); }
+        else { bias = 'NEUTRAL'; conf = 50; }
+        d.predicted = bias; d.biasDetails = { bull: bull, bear: bear, conf: conf }; saveData();
+        var html = '<div class="bias-result '+(bias==='BULLISH'?'bias-bullish':bias==='BEARISH'?'bias-bearish':'bias-neutral')+'"><div class="bias-direction">'+bias+'</div><div class="bias-sub">Confidence: '+conf+'%</div><div class="bias-badge">✅ CONFIRMED</div></div>';
         document.getElementById('biasResult').innerHTML = html;
     }
 
-    function checkWarnings() { var html = ''; var day = new Date().getDay(); if (day === 1) html += '<div class="alert alert-error">⚠️ MONDAY - Markets often range!</div>'; if (day === 0 || day === 6) html += '<div class="alert alert-error">📅 WEEKEND - Closed</div>'; document.getElementById('warnings').innerHTML = html; }
+    function checkWarnings() { var html = ''; var day = new Date().getDay(); if (day === 1) html += '<div class="alert alert-error">⚠️ MONDAY!</div>'; if (day === 0 || day === 6) html += '<div class="alert alert-error">📅 WEEKEND</div>'; document.getElementById('warnings').innerHTML = html; }
 
     function updateLiqDisplays() {
         var d = state.data[state.date];
@@ -891,99 +727,62 @@
         if (d && d.sweeps) { d.sweeps.forEach(function(s) { var boxId = (s.session === 'lon' ? 'lon' : 'ny') + (s.level === 'high' ? 'High' : 'Low') + 'Box'; var statusId = (s.session === 'lon' ? 'lon' : 'ny') + (s.level === 'high' ? 'High' : 'Low') + 'Status'; document.getElementById(boxId).classList.add('swept'); document.getElementById(statusId).textContent = '✅ SWEPT'; }); }
     }
 
-    function toggleLiq(session, level) { var key = session + (level === 'high' ? 'High' : 'Low'); var box = document.getElementById(key + 'Box'); var status = document.getElementById(key + 'Status'); if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [], sweeps: [] }; if (!state.data[state.date].sweeps) state.data[state.date].sweeps = []; if (box.classList.contains('swept')) { box.classList.remove('swept'); status.textContent = '⬜ Not Swept'; state.data[state.date].sweeps = state.data[state.date].sweeps.filter(function(s) { return !(s.session === session && s.level === level); }); } else { box.classList.add('swept'); status.textContent = '✅ SWEPT'; state.data[state.date].sweeps.push({ session: session, level: level, at: new Date().toISOString() }); } saveData(); updateInterimBias(session); }
+    function toggleLiq(session, level) { if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [], sweeps: [] }; if (!state.data[state.date].sweeps) state.data[state.date].sweeps = []; var key = session + (level === 'high' ? 'High' : 'Low'); var box = document.getElementById(key + 'Box'); if (box.classList.contains('swept')) { box.classList.remove('swept'); document.getElementById(key + 'Status').textContent = '⬜ Not Swept'; state.data[state.date].sweeps = state.data[state.date].sweeps.filter(function(s) { return !(s.session === session && s.level === level); }); } else { box.classList.add('swept'); document.getElementById(key + 'Status').textContent = '✅ SWEPT'; state.data[state.date].sweeps.push({ session: session, level: level, at: new Date().toISOString() }); } saveData(); updateInterimBias(session); }
 
-    function logPrice(session) { var time = document.getElementById(session + 'Time').value; var price = parseFloat(document.getElementById(session + 'Price').value); if (!price) { toast('⚠️ Enter price'); return; } if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; if (!state.data[state.date].logs) state.data[state.date].logs = []; state.data[state.date].logs.push({ session: session, time: time, price: price, at: new Date().toISOString() }); saveData(); document.getElementById(session + 'Price').value = ''; toast('📝 Logged ' + time); renderPriceLogs(); updateInterimBias(session); }
-    function renderPriceLogs() { var d = state.data[state.date]; if (!d || !d.logs || d.logs.length === 0) { document.getElementById('lonPriceLog').innerHTML = ''; document.getElementById('nyPriceLog').innerHTML = ''; return; } ['lon', 'ny'].forEach(function(s) { var logs = d.logs.filter(function(l) { return l.session === s; }).slice(-5); var html = ''; if (logs.length > 0) { html = '<div class="card"><div class="card-title" style="font-size:11px">📊 Price Log</div>'; logs.forEach(function(l) { html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #e2e8f0;font-size:10px"><span>'+l.time+'</span><span style="font-weight:600">'+l.price.toFixed(5)+'</span></div>'; }); html += '</div>'; } document.getElementById(s + 'PriceLog').innerHTML = html; }); }
+    function logPrice(session) { var time = document.getElementById(session + 'Time').value; var price = parseFloat(document.getElementById(session + 'Price').value); if (!price) { toast('⚠️ Enter price'); return; } if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; if (!state.data[state.date].logs) state.data[state.date].logs = []; state.data[state.date].logs.push({ session: session, time: time, price: price, at: new Date().toISOString() }); saveData(); document.getElementById(session + 'Price').value = ''; toast('📝 Logged'); renderPriceLogs(); updateInterimBias(session); }
+    function renderPriceLogs() { var d = state.data[state.date]; if (!d || !d.logs) { document.getElementById('lonPriceLog').innerHTML = ''; document.getElementById('nyPriceLog').innerHTML = ''; return; } ['lon', 'ny'].forEach(function(s) { var logs = d.logs.filter(function(l) { return l.session === s; }).slice(-5); var html = ''; if (logs.length > 0) { html = '<div class="card"><div class="card-title" style="font-size:11px">📊 Log</div>'; logs.forEach(function(l) { html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #e2e8f0;font-size:10px"><span>'+l.time+'</span><span style="font-weight:600">'+l.price.toFixed(5)+'</span></div>'; }); html += '</div>'; } document.getElementById(s + 'PriceLog').innerHTML = html; }); }
 
-    function renderChecklist() { var items = checkItems[state.tradeType]; ['setup', 'trap', 'trigger', 'entry', 'risk'].forEach(function(phase) { var html = ''; if (items && items[phase]) { items[phase].forEach(function(item) { var checked = state.checklist[item.key]; html += '<div class="check-item '+(checked?'checked':'')+'" onclick="toggleCheck(\''+item.key+'\')"><div class="check-box">'+(checked?'<span class="check-mark">✓</span>':'')+'</div><span>'+item.label+(item.critical?' ⭐':'')+'</span></div>'; }); } var el = document.getElementById('check' + phase.charAt(0).toUpperCase() + phase.slice(1)); if (el) el.innerHTML = html; }); calculateGrade(); }
+    function renderChecklist() { ['setup', 'trap', 'trigger', 'entry', 'risk'].forEach(function(phase) { var html = ''; if (checkItems[phase]) { checkItems[phase].forEach(function(item) { var checked = state.checklist[item.key]; html += '<div class="check-item '+(checked?'checked':'')+'" onclick="toggleCheck(\''+item.key+'\')"><div class="check-box">'+(checked?'<span class="check-mark">✓</span>':'')+'</div><span>'+item.label+(item.critical?' ⭐':'')+'</span></div>'; }); } var el = document.getElementById('check' + phase.charAt(0).toUpperCase() + phase.slice(1)); if (el) el.innerHTML = html; }); calculateGrade(); }
     function toggleCheck(key) { state.checklist[key] = !state.checklist[key]; if (state.data[state.date]) { state.data[state.date].checklist = state.checklist; saveData(); } renderChecklist(); }
-    function calculateGrade() { var criticals = ['h4Zone','h4Imbalance','h1Nested','inducementCreated','inducementSwept','h1BodyClose','m5Sweep','m5BodyClose']; var total = Object.keys(state.checklist).filter(function(k) { return state.checklist[k]; }).length; var critical = criticals.filter(function(k) { return state.checklist[k]; }).length; var grade, gradeClass, rec; if (critical === 8 && total >= 15) { grade = 'A+'; gradeClass = 'grade-aplus'; rec = '✅ TAKE THIS TRADE'; } else if (critical >= 7 && total >= 12) { grade = 'A'; gradeClass = 'grade-a'; rec = '✅ Good setup'; } else if (critical >= 5 && total >= 8) { grade = 'B'; gradeClass = 'grade-b'; rec = '⚠️ B Setup (~30% WR)'; } else { grade = 'C'; gradeClass = 'grade-c'; rec = '❌ SKIP'; } var html = '<div class="grade-box '+gradeClass+'"><div class="grade-letter">'+grade+'</div><div class="grade-label">'+total+'/19 • '+critical+'/8 critical</div><div style="margin-top:6px;font-size:12px">'+rec+'</div></div>'; document.getElementById('gradeResult').innerHTML = html; document.getElementById('tradeButtons').classList.toggle('hidden', grade !== 'A+' && grade !== 'A'); }
+    function calculateGrade() { var criticals = ['h4Zone','h4Imbalance','h1Nested','inducementCreated','inducementSwept','h1BodyClose','m5Sweep','m5BodyClose']; var total = Object.keys(state.checklist).filter(function(k) { return state.checklist[k]; }).length; var critical = criticals.filter(function(k) { return state.checklist[k]; }).length; var grade, gradeClass, rec; if (critical === 8 && total >= 15) { grade = 'A+'; gradeClass = 'grade-aplus'; rec = '✅ TAKE IT'; } else if (critical >= 7 && total >= 12) { grade = 'A'; gradeClass = 'grade-a'; rec = '✅ Good'; } else if (critical >= 5) { grade = 'B'; gradeClass = 'grade-b'; rec = '⚠️ ~30% WR'; } else { grade = 'C'; gradeClass = 'grade-c'; rec = '❌ SKIP'; } var html = '<div class="grade-box '+gradeClass+'"><div class="grade-letter">'+grade+'</div><div class="grade-label">'+total+'/19 • '+critical+'/8 critical</div><div style="margin-top:6px;font-size:12px">'+rec+'</div></div>'; document.getElementById('gradeResult').innerHTML = html; document.getElementById('tradeButtons').classList.toggle('hidden', grade !== 'A+' && grade !== 'A'); }
 
-    function recordTrade(result) { if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; if (!state.data[state.date].trades) state.data[state.date].trades = []; var criticals = ['h4Zone','h4Imbalance','h1Nested','inducementCreated','inducementSwept','h1BodyClose','m5Sweep','m5BodyClose']; var critical = criticals.filter(function(k) { return state.checklist[k]; }).length; var grade = critical === 8 ? 'A+' : critical >= 7 ? 'A' : critical >= 5 ? 'B' : 'C'; state.data[state.date].trades.push({ result: result, grade: grade, criticalCount: critical, checklist: JSON.parse(JSON.stringify(state.checklist)), tradeType: state.tradeType, at: new Date().toISOString() }); saveData(); addLog('Trade: ' + result + ' (' + grade + ')', result === 'win' ? 'success' : 'error'); toast(result === 'win' ? '✅ Win!' : '❌ Loss'); updateStatsDisplay(); }
+    function recordTrade(result) { if (!state.data[state.date]) state.data[state.date] = { date: state.date, key: {}, asia: {}, london: {}, ny: {}, outcomes: {}, trades: [], logs: [] }; if (!state.data[state.date].trades) state.data[state.date].trades = []; var criticals = ['h4Zone','h4Imbalance','h1Nested','inducementCreated','inducementSwept','h1BodyClose','m5Sweep','m5BodyClose']; var critical = criticals.filter(function(k) { return state.checklist[k]; }).length; var grade = critical === 8 ? 'A+' : critical >= 7 ? 'A' : critical >= 5 ? 'B' : 'C'; state.data[state.date].trades.push({ result: result, grade: grade, at: new Date().toISOString() }); saveData(); toast(result === 'win' ? '✅ Win!' : '❌ Loss'); updateStatsDisplay(); }
 
-    function updateStats() { var days = Object.keys(state.data).length; var total = 0, correct = 0, trades = 0; Object.values(state.data).forEach(function(d) { if (d.predicted && d.outcomes && d.outcomes.london) { total++; if (d.predicted.toLowerCase() === d.outcomes.london.toLowerCase()) correct++; } if (d.trades) trades += d.trades.length; }); document.getElementById('statDays').textContent = days; document.getElementById('statAccuracy').textContent = total > 0 ? Math.round(correct/total*100)+'%' : '--%'; document.getElementById('statTrades').textContent = trades; var alert = document.getElementById('syncStatusAlert'); if (gdrive.token) { alert.innerHTML = '✅ GDrive connected. Auto-sync on save.'; alert.style.background = 'rgba(34,197,94,0.2)'; } else { alert.innerHTML = '⚠️ Local only. Auto-sync on save (not real-time).'; } }
+    function updateStats() { var days = Object.keys(state.data).length; var total = 0, correct = 0, trades = 0; Object.values(state.data).forEach(function(d) { if (d.predicted && d.outcomes && d.outcomes.london) { total++; if (d.predicted.toLowerCase() === d.outcomes.london.toLowerCase()) correct++; } if (d.trades) trades += d.trades.length; }); document.getElementById('statDays').textContent = days; document.getElementById('statAccuracy').textContent = total > 0 ? Math.round(correct/total*100)+'%' : '--%'; document.getElementById('statTrades').textContent = trades; }
 
     function updateStatsDisplay() {
         var allTrades = []; Object.values(state.data).forEach(function(d) { if (d.trades) allTrades = allTrades.concat(d.trades); });
         var wins = allTrades.filter(function(t) { return t.result === 'win'; }).length; var total = allTrades.length;
         document.getElementById('overallWinRate').textContent = total > 0 ? Math.round(wins/total*100)+'%' : '--%';
         document.getElementById('totalTrades').textContent = total;
-        var biasTotal = 0, biasCorrect = 0; Object.values(state.data).forEach(function(d) { if (d.predicted && d.outcomes && d.outcomes.london) { biasTotal++; if (d.predicted.toLowerCase() === d.outcomes.london.toLowerCase()) biasCorrect++; } });
+        var biasTotal = 0, biasCorrect = 0; Object.values(state.data).forEach(function(d) { if (d.predicted && d.outcomes?.london) { biasTotal++; if (d.predicted.toLowerCase() === d.outcomes.london.toLowerCase()) biasCorrect++; } });
         document.getElementById('biasAccuracy').textContent = biasTotal > 0 ? Math.round(biasCorrect/biasTotal*100)+'%' : '--%';
         var gradeStats = { 'A+': { w: 0, l: 0 }, 'A': { w: 0, l: 0 }, 'B': { w: 0, l: 0 }, 'C': { w: 0, l: 0 } };
         allTrades.forEach(function(t) { var g = t.grade || 'C'; if (gradeStats[g]) { if (t.result === 'win') gradeStats[g].w++; else gradeStats[g].l++; } });
-        ['A+', 'A', 'B', 'C'].forEach(function(g) { var t = gradeStats[g].w + gradeStats[g].l; var wr = t > 0 ? Math.round(gradeStats[g].w/t*100) : 0; var id = g === 'A+' ? 'aplusWinRate' : g.toLowerCase() + 'WinRate'; document.getElementById(id).textContent = t > 0 ? wr + '% (' + t + ')' : '-- (0)'; });
-        renderMLPatterns(allTrades);
-        var londonCorrect = 0, londonTotal = 0, nyReversals = 0;
-        Object.values(state.data).forEach(function(d) { if (d.predicted && d.outcomes?.london) { londonTotal++; if (d.predicted.toLowerCase() === d.outcomes.london.toLowerCase()) londonCorrect++; } if (d.outcomes?.london && d.outcomes?.ny && d.outcomes.london !== d.outcomes.ny && d.outcomes.ny !== 'neutral') { nyReversals++; } });
-        document.getElementById('londonPerf').textContent = londonTotal > 0 ? londonCorrect + '/' + londonTotal : '--';
-        document.getElementById('nyReversals').textContent = nyReversals + ' times';
+        ['A+', 'A', 'B', 'C'].forEach(function(g) { var t = gradeStats[g].w + gradeStats[g].l; var wr = t > 0 ? Math.round(gradeStats[g].w/t*100) : 0; var id = g === 'A+' ? 'aplusWinRate' : g.toLowerCase() + 'WinRate'; document.getElementById(id).textContent = t > 0 ? wr + '% (' + t + ')' : '--'; });
     }
 
-    function renderMLPatterns(trades) { var el = document.getElementById('mlPatterns'); if (trades.length < 10) { el.innerHTML = '<p style="font-size:11px;color:#64748b">Need 10+ trades...</p>'; return; } var patterns = []; var smtWins = trades.filter(function(t) { return t.result === 'win' && t.checklist && t.checklist.smtDiv; }).length; var smtTotal = trades.filter(function(t) { return t.checklist && t.checklist.smtDiv; }).length; if (smtTotal >= 5) { var smtWr = Math.round(smtWins/smtTotal*100); patterns.push({ text: 'SMT Divergence: ' + smtWr + '% WR (' + smtTotal + ' trades)', good: smtWr >= 60 }); } var h1Wins = trades.filter(function(t) { return t.result === 'win' && t.checklist && t.checklist.h1BodyClose; }).length; var h1Total = trades.filter(function(t) { return t.checklist && t.checklist.h1BodyClose; }).length; if (h1Total >= 5) { var h1Wr = Math.round(h1Wins/h1Total*100); patterns.push({ text: '1H Body Close: ' + h1Wr + '% WR - ' + (h1Wr >= 70 ? 'KEEP!' : 'Review'), good: h1Wr >= 70 }); } var aplusWins = trades.filter(function(t) { return t.result === 'win' && t.grade === 'A+'; }).length; var aplusTotal = trades.filter(function(t) { return t.grade === 'A+'; }).length; var lowerWins = trades.filter(function(t) { return t.result === 'win' && t.grade !== 'A+' && t.grade !== 'A'; }).length; var lowerTotal = trades.filter(function(t) { return t.grade !== 'A+' && t.grade !== 'A'; }).length; if (aplusTotal >= 3 && lowerTotal >= 3) { var apWr = Math.round(aplusWins/aplusTotal*100); var lwWr = Math.round(lowerWins/lowerTotal*100); patterns.push({ text: 'A+: ' + apWr + '% vs B/C: ' + lwWr + '% - ' + (apWr > lwWr ? 'STICK TO A+!' : 'Review'), good: apWr > lwWr }); } if (patterns.length === 0) { patterns.push({ text: 'Keep logging...', good: true }); } el.innerHTML = patterns.map(function(p) { return '<div style="padding:8px;background:'+(p.good?'#f0fdf4':'#fef2f2')+';border-radius:6px;margin-bottom:6px;font-size:11px;color:'+(p.good?'#166534':'#991b1b')+'">'+p.text+'</div>'; }).join(''); }
+    function updateStorageDetails() { document.getElementById('detailType').textContent = state.cloudAvailable ? 'Cloud + Local' : 'Local Only'; document.getElementById('detailCloud').textContent = state.cloudAvailable ? '✅ Yes' : '❌ No'; document.getElementById('detailNetwork').textContent = navigator.onLine ? '✅ Online' : '❌ Offline'; var gu = localStorage.getItem('bias_v5_GBPUSD'); var gj = localStorage.getItem('bias_v5_GBPJPY'); document.getElementById('detailGU').textContent = gu ? Object.keys(JSON.parse(gu)).length : 0; document.getElementById('detailGJ').textContent = gj ? Object.keys(JSON.parse(gj)).length : 0; }
 
-    function updateStorageDetails() { document.getElementById('detailType').textContent = gdrive.token ? 'Cloud + Local' : 'Local Only'; document.getElementById('detailCloud').textContent = gdrive.token ? '✅ Yes' : '❌ No'; document.getElementById('detailNetwork').textContent = navigator.onLine ? '✅ Online' : '❌ Offline'; var gu = localStorage.getItem('bias_v5_GBPUSD'); var gj = localStorage.getItem('bias_v5_GBPJPY'); document.getElementById('detailGU').textContent = gu ? Object.keys(JSON.parse(gu)).length : 0; document.getElementById('detailGJ').textContent = gj ? Object.keys(JSON.parse(gj)).length : 0; var size = (gu ? gu.length : 0) + (gj ? gj.length : 0); document.getElementById('detailSize').textContent = (size / 1024).toFixed(1) + ' KB'; }
-
-    // HISTORY WITH DELETE
     function renderHistory() {
         var dates = Object.keys(state.data).sort().reverse();
         if (dates.length === 0) { document.getElementById('historyList').innerHTML = '<p style="text-align:center;color:#64748b;padding:20px;font-size:12px">No data</p>'; return; }
         var html = '';
         dates.forEach(function(dateKey) {
-            var d = state.data[dateKey];
-            var predicted = d.predicted || '--';
-            var londonActual = d.outcomes?.london || '--';
+            var d = state.data[dateKey]; var predicted = d.predicted || '--'; var londonActual = d.outcomes?.london || '--';
             var correct = predicted !== '--' && londonActual !== '--' && predicted.toLowerCase() === londonActual.toLowerCase();
-            var wrong = predicted !== '--' && londonActual !== '--' && !correct;
-            var hasTrades = d.trades && d.trades.length > 0;
-            if (state.filter === 'correct' && !correct) return;
-            if (state.filter === 'wrong' && !wrong) return;
-            if (state.filter === 'trades' && !hasTrades) return;
+            var wrong = predicted !== '--' && londonActual !== '--' && !correct; var hasTrades = d.trades && d.trades.length > 0;
+            if (state.filter === 'correct' && !correct) return; if (state.filter === 'wrong' && !wrong) return; if (state.filter === 'trades' && !hasTrades) return;
             var badgeClass = predicted === 'BULLISH' ? 'badge-bull' : predicted === 'BEARISH' ? 'badge-bear' : '';
-            html += '<div class="history-item">';
-            html += '<div class="history-header"><div class="history-date" onclick="loadDateFromHistory(\''+dateKey+'\')">'+formatDate(dateKey)+'</div><span class="history-badge '+badgeClass+'">'+predicted+'</span></div>';
+            html += '<div class="history-item"><div class="history-header"><div class="history-date" onclick="loadDateFromHistory(\''+dateKey+'\')">'+formatDate(dateKey)+'</div><span class="history-badge '+badgeClass+'">'+predicted+'</span></div>';
             html += '<div style="font-size:10px;color:#64748b">London: <b>'+londonActual+'</b>';
             if (londonActual !== '--' && predicted !== '--') html += correct ? ' ✅' : ' ❌';
             if (hasTrades) { var wins = d.trades.filter(function(t) { return t.result === 'win'; }).length; html += ' | '+wins+'W-'+(d.trades.length-wins)+'L'; }
-            html += '</div>';
-            html += '<div class="history-actions"><button class="history-delete" onclick="deleteHistoryEntry(\''+dateKey+'\')">🗑️ Delete</button></div>';
-            html += '</div>';
+            html += '</div><div class="history-actions"><button class="history-delete" onclick="deleteHistoryEntry(\''+dateKey+'\')">🗑️ Delete</button></div></div>';
         });
         document.getElementById('historyList').innerHTML = html || '<p style="text-align:center;color:#64748b;padding:20px;font-size:12px">No matches</p>';
     }
 
-    function deleteHistoryEntry(dateKey) {
-        if (!confirm('Delete entry for ' + formatDate(dateKey) + '? This cannot be undone.')) return;
-        delete state.data[dateKey];
-        saveData();
-        renderHistory();
-        toast('🗑️ Deleted');
-        addLog('Deleted: ' + dateKey, 'warning');
-    }
-
+    function deleteHistoryEntry(dateKey) { if (!confirm('Delete ' + formatDate(dateKey) + '?')) return; delete state.data[dateKey]; saveData(); renderHistory(); toast('🗑️ Deleted'); }
     function filterHistory(filter, btn) { state.filter = filter; document.querySelectorAll('#tab-history .btn-sm').forEach(function(b) { b.classList.remove('btn-active'); }); if (btn) btn.classList.add('btn-active'); renderHistory(); }
     function loadDateFromHistory(dateKey) { if (state.mode === 'backfill') document.getElementById('backfillDate').value = dateKey; else document.getElementById('selectedDate').value = dateKey; loadDay(); showTab('analyze'); }
     function formatDate(str) { var d = new Date(str); return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
 
     function exportData() { var all = {}; ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); }); var blob = new Blob([JSON.stringify({ version: 5.3, exportedAt: new Date().toISOString(), pairs: all }, null, 2)], { type: 'application/json' }); var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'forex_bias_v5.3_' + state.date + '.json'; a.click(); toast('📤 Exported'); }
-    function importData(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function(e) { try { var data = JSON.parse(e.target.result); if (data.pairs) { Object.keys(data.pairs).forEach(function(p) { localStorage.setItem('bias_v5_' + p, JSON.stringify(data.pairs[p])); }); } loadData(); loadDay(); toast('📥 Imported!'); } catch (err) { toast('❌ Import failed'); } }; reader.readAsText(file); }
-
-    var gdrive = { clientId: null, token: null };
-    function loadGDriveConfig() { gdrive.clientId = localStorage.getItem('gdrive_client_id') || ''; document.getElementById('gdriveClientId').value = gdrive.clientId; }
-    function saveGDriveConfig() { gdrive.clientId = document.getElementById('gdriveClientId').value.trim(); localStorage.setItem('gdrive_client_id', gdrive.clientId); }
-    function initGoogleAuth() { if (!gdrive.clientId) { toast('⚠️ Enter Client ID'); return; } try { google.accounts.oauth2.initTokenClient({ client_id: gdrive.clientId, scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email', callback: function(response) { if (response.access_token) { gdrive.token = response.access_token; localStorage.setItem('gdrive_token', gdrive.token); localStorage.setItem('gdrive_token_expiry', Date.now() + 3600000); fetchUserInfo(); toast('✅ Connected'); updateSyncStatusBar(); } } }).requestAccessToken(); } catch (e) { toast('❌ Auth failed'); } }
-    function restoreGDriveSession() { var token = localStorage.getItem('gdrive_token'); var expiry = localStorage.getItem('gdrive_token_expiry'); if (token && expiry && Date.now() < parseInt(expiry)) { gdrive.token = token; fetchUserInfo(); } }
-    function fetchUserInfo() { fetch('https://www.googleapis.com/oauth2/v2/userinfo', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }).then(function(r) { return r.json(); }).then(function(user) { document.getElementById('gdrivePhoto').src = user.picture || ''; document.getElementById('gdriveName').textContent = user.name || 'User'; document.getElementById('gdriveEmail').textContent = user.email || ''; document.getElementById('gdriveNotConnected').classList.add('hidden'); document.getElementById('gdriveConnected').classList.remove('hidden'); document.getElementById('syncBadge').className = 'sync-badge synced'; document.getElementById('syncDot').className = 'sync-dot synced'; document.getElementById('syncText').textContent = '☁️ Synced'; updateStats(); updateSyncStatusBar(); }).catch(clearGDriveSession); }
-    function signOutGDrive() { clearGDriveSession(); toast('Signed out'); updateSyncStatusBar(); }
-    function clearGDriveSession() { gdrive.token = null; localStorage.removeItem('gdrive_token'); localStorage.removeItem('gdrive_token_expiry'); document.getElementById('gdriveNotConnected').classList.remove('hidden'); document.getElementById('gdriveConnected').classList.add('hidden'); document.getElementById('syncBadge').className = 'sync-badge local'; document.getElementById('syncDot').className = 'sync-dot local'; document.getElementById('syncText').textContent = 'Local'; updateStats(); updateSyncStatusBar(); }
-    function autoSync() { if (gdrive.token) uploadToGDrive(true); }
-    function manualSync() { if (gdrive.token) uploadToGDrive(false); else toast('⚠️ Connect GDrive first'); }
-    function uploadToGDrive(silent) { if (!gdrive.token) return; document.getElementById('syncDot').className = 'sync-dot syncing'; var all = {}; ['GBPUSD', 'GBPJPY'].forEach(function(p) { var d = localStorage.getItem('bias_v5_' + p); if (d) all[p] = JSON.parse(d); }); var content = JSON.stringify({ version: 5.3, updatedAt: new Date().toISOString(), pairs: all }); var fileId = localStorage.getItem('gdrive_file_id'); if (fileId) { fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', { method: 'PATCH', headers: { 'Authorization': 'Bearer ' + gdrive.token, 'Content-Type': 'application/json' }, body: content }).then(function() { document.getElementById('syncDot').className = 'sync-dot synced'; state.lastSync = new Date().toLocaleTimeString().slice(0,5); updateSyncStatusBar(); if (!silent) toast('☁️ Uploaded to GDrive'); addLog('Uploaded to GDrive', 'success'); }).catch(function() { document.getElementById('syncDot').className = 'sync-dot synced'; }); } else { var metadata = { name: 'forex_bias_v5.json', mimeType: 'application/json' }; var form = new FormData(); form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' })); form.append('file', new Blob([content], { type: 'application/json' })); fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method: 'POST', headers: { 'Authorization': 'Bearer ' + gdrive.token }, body: form }).then(function(r) { return r.json(); }).then(function(file) { localStorage.setItem('gdrive_file_id', file.id); document.getElementById('syncDot').className = 'sync-dot synced'; state.lastSync = new Date().toLocaleTimeString().slice(0,5); updateSyncStatusBar(); if (!silent) toast('☁️ Uploaded to GDrive'); addLog('Created GDrive file', 'success'); }).catch(function() { document.getElementById('syncDot').className = 'sync-dot synced'; }); } }
-    function downloadFromGDrive() { if (!gdrive.token) return; document.getElementById('syncDot').className = 'sync-dot syncing'; fetch('https://www.googleapis.com/drive/v3/files?q=name%3D%27forex_bias_v5.json%27&spaces=drive', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }).then(function(r) { return r.json(); }).then(function(result) { if (result.files && result.files.length > 0) { var fileId = result.files[0].id; localStorage.setItem('gdrive_file_id', fileId); return fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { 'Authorization': 'Bearer ' + gdrive.token } }); } throw new Error('No file'); }).then(function(r) { return r.json(); }).then(function(data) { if (data.pairs) { var newCount = 0; Object.keys(data.pairs).forEach(function(p) { var local = JSON.parse(localStorage.getItem('bias_v5_' + p) || '{}'); var cloud = data.pairs[p]; Object.keys(cloud).forEach(function(dateKey) { if (!local[dateKey]) { local[dateKey] = cloud[dateKey]; newCount++; } }); localStorage.setItem('bias_v5_' + p, JSON.stringify(local)); }); loadData(); loadDay(); document.getElementById('syncDot').className = 'sync-dot synced'; state.lastSync = new Date().toLocaleTimeString().slice(0,5); updateSyncStatusBar(); toast('☁️ Downloaded' + (newCount > 0 ? ' (+' + newCount + ' days)' : '')); addLog('Downloaded from GDrive', 'success'); } }).catch(function(e) { document.getElementById('syncDot').className = 'sync-dot synced'; toast('⚠️ ' + e.message); }); }
+    function importData(event) { var file = event.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function(e) { try { var data = JSON.parse(e.target.result); if (data.pairs) { Object.keys(data.pairs).forEach(function(p) { localStorage.setItem('bias_v5_' + p, JSON.stringify(data.pairs[p])); }); } loadData(); loadDay(); saveToCloud(); toast('📥 Imported!'); } catch (err) { toast('❌ Failed'); } }; reader.readAsText(file); }
 
     function showTab(name) { ['analyze', 'london', 'ny', 'checklist', 'stats', 'history'].forEach(function(t) { document.getElementById('tab-' + t).classList.add('hidden'); }); document.getElementById('tab-' + name).classList.remove('hidden'); document.querySelectorAll('.tabs .tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); if (name === 'history') renderHistory(); if (name === 'stats') updateStatsDisplay(); if (name === 'london' || name === 'ny') { updateLiqDisplays(); renderPriceLogs(); updateInterimBias(name === 'london' ? 'lon' : 'ny'); } }
-    function showStorageTab(name) { ['Status', 'Log', 'Details', 'Gdrive'].forEach(function(t) { document.getElementById('storageTab' + t).classList.add('hidden'); }); document.getElementById('storageTab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.remove('hidden'); document.querySelectorAll('.storage-tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); }
+    function showStorageTab(name) { ['Status', 'Log', 'Details'].forEach(function(t) { document.getElementById('storageTab' + t).classList.add('hidden'); }); document.getElementById('storageTab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.remove('hidden'); document.querySelectorAll('.storage-tab').forEach(function(t) { t.classList.remove('active'); }); event.target.classList.add('active'); }
     function toggleSyncPanel() { document.getElementById('syncPanel').classList.toggle('show'); }
     function toast(msg) { var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(function() { t.classList.remove('show'); }, 3000); }
 
