@@ -326,7 +326,7 @@ function migrate(d){
   d.settings.ftmoAccounts.forEach(a=>{const da=defAccount();Object.keys(da).forEach(k=>{if(a[k]===undefined)a[k]=da[k]})});
   if(!d.settings.goal)d.settings.goal={enabled:false,target:100000,startDate:"",payouts:[]};
   const dg=defSettings().goal;Object.keys(dg).forEach(k=>{if(d.settings.goal[k]===undefined)d.settings.goal[k]=dg[k]});
-  (d.trades||[]).forEach(t=>{if(t.usePartial===undefined)t.usePartial=false;if(t.partialPct===undefined)t.partialPct="50";if(t.partialRR===undefined)t.partialRR="1.0";if(t.tp1===undefined)t.tp1="";if(t.leg1Result===undefined)t.leg1Result="";if(t.leg2Result===undefined)t.leg2Result="";if(t.combinedR===undefined)t.combinedR="";if(t.dollarPL===undefined)t.dollarPL=null;if(t.session===undefined)t.session="";if(t.ftmoAccounts===undefined)t.ftmoAccounts=[];if(t.exitPrice===undefined)t.exitPrice="";if(t.leg1Exit===undefined)t.leg1Exit="";if(t.leg2Exit===undefined)t.leg2Exit="";if(t.riskDollar===undefined)t.riskDollar=""})
+  (d.trades||[]).forEach(t=>{if(t.usePartial===undefined)t.usePartial=false;if(t.partialPct===undefined)t.partialPct="50";if(t.partialRR===undefined)t.partialRR="1.0";if(t.tp1===undefined)t.tp1="";if(t.leg1Result===undefined)t.leg1Result="";if(t.leg2Result===undefined)t.leg2Result="";if(t.combinedR===undefined)t.combinedR="";if(t.dollarPL===undefined)t.dollarPL=null;if(t.session===undefined)t.session="";if(t.ftmoAccounts===undefined)t.ftmoAccounts=[];if(t.exitPrice===undefined)t.exitPrice="";if(t.leg1Exit===undefined)t.leg1Exit="";if(t.leg2Exit===undefined)t.leg2Exit="";if(t.riskDollar===undefined)t.riskDollar="";if(t.actualPL===undefined)t.actualPL=""})
 }
 function load(){try{const d=JSON.parse(localStorage.getItem(SK));if(d?.trades){migrate(d);return d}}catch{}const f={trades:[],avoidDays:[],settings:defSettings()};return f}
 function save(){localStorage.setItem(SK,JSON.stringify(D))}
@@ -369,7 +369,7 @@ function ftmoStatsForAccount(s,acctId){
   // If acctId provided, filter to trades tagged for this account (or all if none tagged)
   if(acctId){tr=tr.filter(t=>!t.ftmoAccounts||t.ftmoAccounts.length===0||t.ftmoAccounts.includes(acctId))}
   let cum=0,peak=acct,daily={};
-  tr.forEach(t=>{const r=tradeR(t),tRisk=t.riskDollar&&parseFloat(t.riskDollar)>0?parseFloat(t.riskDollar):rPer,pl=r*tRisk;cum+=pl;const bal=acct+cum;if(bal>peak)peak=bal;
+  tr.forEach(t=>{const _apl=parseFloat(t.actualPL);const pl=!isNaN(_apl)?_apl:(()=>{const r=tradeR(t),tRisk=t.riskDollar&&parseFloat(t.riskDollar)>0?parseFloat(t.riskDollar):rPer;return r*tRisk})();cum+=pl;const bal=acct+cum;if(bal>peak)peak=bal;
     const dk=t.date||"";if(dk){if(!daily[dk])daily[dk]={pl:0,n:0,cum:0};daily[dk].pl+=pl;daily[dk].n++}});
   let rc=0;Object.keys(daily).sort().forEach(k=>{rc+=daily[k].pl;daily[k].cum=rc});
   const bal=acct+cum,tdd=peak>0?((peak-bal)/acct)*100:0;
@@ -404,10 +404,14 @@ function toast(m,t="success"){tMsg=m;tTy=t;R();clearTimeout(tTm);tTm=setTimeout(
 // ═══════════════════════════════════════════════════
 // GOOGLE DRIVE
 // ═══════════════════════════════════════════════════
+const GD_TK_KEY="occ_gd_token",GD_EXP_KEY="occ_gd_expiry";
 const GD={tc:null,tk:null,_r:null,folderId:null,
-  init(c){if(!c)return Promise.resolve(false);if(this._r)return this._r;this._r=new Promise(r=>{if(window.google?.accounts?.oauth2){this.tc=google.accounts.oauth2.initTokenClient({client_id:c,scope:"https://www.googleapis.com/auth/drive.file",callback:()=>{}});return r(true)}const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=()=>{this.tc=google.accounts.oauth2.initTokenClient({client_id:c,scope:"https://www.googleapis.com/auth/drive.file",callback:()=>{}});r(true)};s.onerror=()=>r(false);document.head.appendChild(s)});return this._r},
-  auth(){return new Promise((r,j)=>{if(!this.tc)return j("err");this.tc.callback=x=>{if(x.error)return j(x.error);this.tk=x.access_token;r(this.tk)};this.tc.requestAccessToken({prompt:this.tk?"":"consent"})})},
-  async t(){if(!this.tk)await this.auth();return this.tk},
+  _loadCached(){try{const tk=localStorage.getItem(GD_TK_KEY),exp=localStorage.getItem(GD_EXP_KEY);if(tk&&exp&&Date.now()<parseInt(exp)){this.tk=tk;return true}}catch{}return false},
+  _saveToken(tk,expiresIn){this.tk=tk;try{localStorage.setItem(GD_TK_KEY,tk);localStorage.setItem(GD_EXP_KEY,String(Date.now()+(expiresIn||3500)*1000))}catch{}},
+  _clearToken(){this.tk=null;try{localStorage.removeItem(GD_TK_KEY);localStorage.removeItem(GD_EXP_KEY)}catch{}},
+  init(c){if(!c)return Promise.resolve(false);if(this._r)return this._r;this._r=new Promise(r=>{const setup=()=>{this.tc=google.accounts.oauth2.initTokenClient({client_id:c,scope:"https://www.googleapis.com/auth/drive.file",callback:()=>{}});this._loadCached();r(true)};if(window.google?.accounts?.oauth2){setup();return}const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=()=>setup();s.onerror=()=>r(false);document.head.appendChild(s)});return this._r},
+  auth(silent){return new Promise((r,j)=>{if(!this.tc)return j("err");this.tc.callback=x=>{if(x.error){if(silent)return j("silent_fail");return j(x.error)}this._saveToken(x.access_token,x.expires_in);r(this.tk)};this.tc.requestAccessToken({prompt:silent?"none":"consent"})})},
+  async t(){if(this.tk){const exp=localStorage.getItem(GD_EXP_KEY);if(exp&&Date.now()<parseInt(exp))return this.tk}try{await this.auth(true);return this.tk}catch{await this.auth(false);return this.tk}},
 
   // Find or create images folder
   async getFolder(){
@@ -441,7 +445,7 @@ const GD={tc:null,tk:null,_r:null,folderId:null,
     await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}`,{method:"DELETE",headers:{Authorization:`Bearer ${t}`}})},
 
   // JSON backup
-  async find(){const t=await this.t(),q=encodeURIComponent(`name='${GDN}' and trashed=false`);const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id)`,{headers:{Authorization:`Bearer ${t}`}});if(!r.ok){this.tk=null;throw"err"}return(await r.json()).files?.[0]||null},
+  async find(){const t=await this.t(),q=encodeURIComponent(`name='${GDN}' and trashed=false`);const r=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id)`,{headers:{Authorization:`Bearer ${t}`}});if(!r.ok){this._clearToken();throw"err"}return(await r.json()).files?.[0]||null},
   async push(d){const t=await this.t(),ex=await this.find(),b=JSON.stringify(d,null,2);if(ex){await fetch(`https://www.googleapis.com/upload/drive/v3/files/${ex.id}?uploadType=media`,{method:"PATCH",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:b});return}const fd=new FormData();fd.append("metadata",new Blob([JSON.stringify({name:GDN,mimeType:"application/json"})],{type:"application/json"}));fd.append("file",new Blob([b],{type:"application/json"}));await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:`Bearer ${t}`},body:fd})},
   async pull(){const t=await this.t(),f=await this.find();if(!f)return null;return(await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,{headers:{Authorization:`Bearer ${t}`}})).json()}
 };
@@ -514,11 +518,11 @@ function pgLog(){let h=`<div class="hl">Trades</div><div style="display:flex;gap
   tr.forEach(t=>{
     const tR=tradeR(t),rDisp=t.usePartial&&t.combinedR!==""?`${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R`:tR!==0?`${tR>=0?"+":""}${tR.toFixed(2)}R`:"";
     h+=`<div class="ti" onclick="expId=expId==='${t.id}'?null:'${t.id}';R()"><div class="tt"><div class="tl"><div class="rd ${t.result}"></div><span class="tp">${t.pair}</span>${t.usePartial?`<span class="pbadge">P</span>`:""}${(t.ftmoAccounts||[]).length>0?`<span class="pbadge">${t.ftmoAccounts.length}A</span>`:""}<span style="font-size:11px;color:var(--muted);font-weight:500">${t.direction}</span>${t.session?`<span style="font-size:9px;color:var(--dim);font-weight:600;letter-spacing:1px;text-transform:uppercase">${t.session==="london"?"LDN":t.session==="newyork"?"NY-DST":"NY-STD"}</span>`:""}</div><div class="tm">${t.date?fmt(t.date):""} ${rDisp?`· ${rDisp}`:""}</div></div>`;
-    if(expId===t.id){h+=`<div class="te"><div class="teg">${t.entry?`<div><div class="tel">Entry</div><div class="tev">${esc(t.entry)}</div></div>`:""}${t.sl?`<div><div class="tel">SL</div><div class="tev">${esc(t.sl)}</div></div>`:""}${t.tp?`<div><div class="tel">TP</div><div class="tev">${esc(t.tp)}</div></div>`:""}${t.exitPrice?`<div><div class="tel">Exit</div><div class="tev">${esc(t.exitPrice)}</div></div>`:""}${t.occH?`<div><div class="tel">Zone H</div><div class="tev">${esc(t.occH)}</div></div>`:""}${t.occL?`<div><div class="tel">Zone L</div><div class="tev">${esc(t.occL)}</div></div>`:""}${t.riskDollar?`<div><div class="tel">Risk $</div><div class="tev">$${esc(t.riskDollar)}</div></div>`:""}</div>`;
+    if(expId===t.id){h+=`<div class="te"><div class="teg">${t.entry?`<div><div class="tel">Entry</div><div class="tev">${esc(t.entry)}</div></div>`:""}${t.sl?`<div><div class="tel">SL</div><div class="tev">${esc(t.sl)}</div></div>`:""}${t.tp?`<div><div class="tel">TP</div><div class="tev">${esc(t.tp)}</div></div>`:""}${t.exitPrice?`<div><div class="tel">Exit</div><div class="tev">${esc(t.exitPrice)}</div></div>`:""}${t.occH?`<div><div class="tel">Zone H</div><div class="tev">${esc(t.occH)}</div></div>`:""}${t.occL?`<div><div class="tel">Zone L</div><div class="tev">${esc(t.occL)}</div></div>`:""}${t.riskDollar?`<div><div class="tel">Risk $</div><div class="tev">$${esc(t.riskDollar)}</div></div>`:""}${t.actualPL?`<div><div class="tel">MT5 P&L</div><div class="tev" style="font-weight:700;color:${parseFloat(t.actualPL)>=0?"var(--accent)":"var(--text)"}">${parseFloat(t.actualPL)>=0?"+":""}$${parseFloat(t.actualPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>`:""}</div>`;
       // Partial TP details
       if(t.usePartial){h+=`<div class="teg" style="margin-top:8px">${t.tp1?`<div><div class="tel">TP1</div><div class="tev">${esc(t.tp1)}</div></div>`:""}<div><div class="tel">Leg 1 (${t.partialPct||50}%)</div><div class="tev">${t.leg1Result||"—"}${t.leg1Exit?" @ "+esc(t.leg1Exit):""}</div></div><div><div class="tel">Leg 2 (${100-parseInt(t.partialPct||50)}%)</div><div class="tev">${t.leg2Result||"—"}${t.leg2Exit?" @ "+esc(t.leg2Exit):""}</div></div>${t.combinedR!==""&&t.combinedR!==null?`<div><div class="tel">Combined R</div><div class="tev" style="font-weight:700">${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R</div></div>`:""}</div>`}
-      // Dollar P&L
-      if(t.dollarPL!==null&&t.dollarPL!==undefined){h+=`<div style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600">${t.dollarPL>=0?"+":""}$${t.dollarPL.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>`}
+      // Dollar P&L — show actualPL if set, else dollarPL
+      if(t.dollarPL!==null&&t.dollarPL!==undefined){const _isActual=t.actualPL&&!isNaN(parseFloat(t.actualPL));h+=`<div style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600">${t.dollarPL>=0?"+":""}$${t.dollarPL.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}${_isActual?' <span style="font-size:9px;color:var(--sub);font-weight:500">MT5</span>':""}</div>`}
       h+=`${t.notes?`<div style="font-style:italic;color:var(--muted)">"${esc(t.notes)}"</div>`:""}${t.images?.length?`<div style="display:flex;gap:6px;margin-top:10px">${t.images.map(im=>`<img src="${imUrl(im)}" style="height:44px;border-radius:4px;cursor:pointer;border:1px solid var(--line2)" onclick="event.stopPropagation();lbS='${imUrlFull(im).replace(/'/g,"\\'")}';R()">`).join("")}</div>`:""}
       <div class="ta"><button class="btn-t" onclick="event.stopPropagation();editId='${t.id}';go('new')">Edit</button><button class="btn-t" style="color:var(--text)" onclick="event.stopPropagation();del('${t.id}')">Delete</button></div></div>`}
     h+=`</div>`});h+=`</div>`;return h}
@@ -594,6 +598,10 @@ function pgForm(){
     if(f.leg1Result&&f.leg2Result){const _cr=calcCombinedR(f);if(Math.abs(_cr)<0.05)f.result="BE";else f.result=_cr>0?"WIN":"LOSS"}
     h+=`<div class="rg">${["WIN","LOSS","BE"].map(r=>`<button class="rp ${f.result===r?r[0]:""}" onclick="uf('result','${r}')">${r==="BE"?"Break-even":r}</button>`).join("")}</div>`;
   }
+  // Actual P&L override from MT5
+  h+=`<div style="margin-top:16px">${fi("Actual P&L ($) <span style='font-weight:400;color:var(--sub);font-size:10px'>from MT5 — overrides calculated</span>","actualPL",f.actualPL)}</div>`;
+  const _calcPL=(()=>{const rd=parseFloat(f.riskDollar);const rr=f.usePartial?parseFloat(calcCombinedR(f)):calcRRFromPrices(f.entry,f.sl,f.exitPrice||f.tp,f.direction);if(rr===null)return null;if(!isNaN(rd)&&rd>0)return Math.round(rr*rd*100)/100;const ta=(f.ftmoAccounts||[]).map(aid=>D.settings.ftmoAccounts.find(a=>a.id===aid)).filter(Boolean);if(ta.length>0){return Math.round(rr*ta[0].accountSize*(ta[0].riskPct/100)*100)/100}const ft=D.settings.ftmo;if(ft&&ft.enabled)return Math.round(rr*ft.accountSize*(ft.riskPct/100)*100)/100;return null})();
+  if(_calcPL!==null&&!f.actualPL)h+=`<div style="margin-top:4px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--sub)">Calc: ${_calcPL>=0?"+":""}$${_calcPL.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>`;
   h+=`<hr class="sr"><div class="slbl">Notes</div><textarea class="fi" placeholder="Observations…" onchange="uf('notes',this.value)">${esc(f.notes)}</textarea>`;
   h+=`<div style="display:flex;gap:12px;justify-content:flex-end;margin-top:32px"><button class="btn-b" onclick="editId=null;window._f=null;go('home')">Cancel</button><button class="btn-a" onclick="svTr()">${editId?"Update":"Save"}</button></div>`;
   return h}
@@ -1390,7 +1398,7 @@ function pgSetup(){let h=`<div class="hl">Setup</div>`;
     h+=`<div style="margin-top:12px;padding:10px 12px;border:1px solid var(--line3);font-size:11px;line-height:1.8;font-family:'JetBrains Mono',monospace">Target: $${(gl.target||100000).toLocaleString()} · Payouts logged: ${(gl.payouts||[]).length} · Start: ${gl.startDate||"not set"}</div>`;
   }
 
-  h+=`<hr class="sr dk"><div class="slbl">Google Drive</div><p class="bt" style="margin-bottom:16px">Sync data & images to Google Drive. Images are stored in a <strong>"${IMG_FOLDER}"</strong> folder.</p><div style="margin-bottom:16px"><label class="fl">OAuth Client ID</label><input class="fi" value="${esc(D.settings.gdCid||"")}" placeholder="xxxx.apps.googleusercontent.com" onchange="GD._r=null;GD.tk=null;GD.folderId=null;D.settings.gdCid=this.value.trim();save()"></div><label style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:16px"><div class="cc" style="width:20px;height:20px;${D.settings.gdSync?"background:var(--accent);border-color:var(--accent);color:var(--accent-text)":""}" onclick="D.settings.gdSync=!D.settings.gdSync;save();R()">${D.settings.gdSync?"✓":""}</div><span style="font-size:13px;color:var(--sub)">Auto-sync on save</span></label>`;
+  h+=`<hr class="sr dk"><div class="slbl">Google Drive</div><p class="bt" style="margin-bottom:16px">Sync data & images to Google Drive. Images are stored in a <strong>"${IMG_FOLDER}"</strong> folder.</p><div style="margin-bottom:16px"><label class="fl">OAuth Client ID</label><input class="fi" value="${esc(D.settings.gdCid||"")}" placeholder="xxxx.apps.googleusercontent.com" onchange="GD._r=null;GD._clearToken();GD.folderId=null;D.settings.gdCid=this.value.trim();save()"></div><label style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:16px"><div class="cc" style="width:20px;height:20px;${D.settings.gdSync?"background:var(--accent);border-color:var(--accent);color:var(--accent-text)":""}" onclick="D.settings.gdSync=!D.settings.gdSync;save();R()">${D.settings.gdSync?"✓":""}</div><span style="font-size:13px;color:var(--sub)">Auto-sync on save</span></label>`;
   if(D.settings.gdCid)h+=`<div style="display:flex;gap:10px"><button class="btn-a" onclick="gPush()" ${gSt==="syncing"?"disabled":""}>Push</button><button class="btn-b" onclick="gPull()" ${gSt==="syncing"?"disabled":""}>Pull</button></div>`;
 
   h+=`<hr class="sr"><div class="slbl">Backup</div><div style="display:flex;gap:10px"><button class="btn-b" onclick="expJ()">Export JSON</button><label class="btn-b" style="cursor:pointer">Import<input type="file" accept=".json" class="hid" onchange="impJ(this)"></label></div>`;
@@ -1468,12 +1476,14 @@ function svTr(){const f=window._f;if(!f||!f.result){alert("Select a result");ret
   }
   // Compute partial TP combined R
   if(f.usePartial&&f.leg1Result&&f.leg2Result){f.combinedR=calcCombinedR(f)}else if(!f.usePartial){f.combinedR="";f.leg1Result="";f.leg2Result="";f.leg1Exit="";f.leg2Exit="";f.tp1=""}
-  // Compute dollar P&L — use riskDollar if set, otherwise account-based
-  const riskD=parseFloat(f.riskDollar);
+  // Compute dollar P&L — actualPL overrides everything, then riskDollar, then account-based
+  const _actPL=parseFloat(f.actualPL);
+  if(!isNaN(_actPL)){f.dollarPL=_actPL}
+  else{const riskD=parseFloat(f.riskDollar);
   const taggedAccts=(f.ftmoAccounts||[]).map(aid=>D.settings.ftmoAccounts.find(a=>a.id===aid)).filter(Boolean);
   if(!isNaN(riskD)&&riskD>0){f.dollarPL=Math.round(tradeR(f)*riskD*100)/100}
   else if(taggedAccts.length>0){const a=taggedAccts[0];const rPer=a.accountSize*(a.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}
-  else{const ft=D.settings.ftmo;if(ft&&ft.enabled){const rPer=ft.accountSize*(ft.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}else{f.dollarPL=null}}
+  else{const ft=D.settings.ftmo;if(ft&&ft.enabled){const rPer=ft.accountSize*(ft.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}else{f.dollarPL=null}}}
   if(editId){const i=D.trades.findIndex(t=>t.id===editId);if(i>=0)D.trades[i]={...f,id:editId}}else D.trades.push({...f,id:uid()});save();editId=null;window._f=null;tab="log";toast("Saved");R();if(D.settings.gdSync&&D.settings.gdCid)gPush()}
 function del(id){if(!confirm("Delete?"))return;D.trades=D.trades.filter(t=>t.id!==id);save();toast("Deleted","warn");R()}
 function expJ(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:"application/json"}));a.download=`OCC_${new Date().toISOString().slice(0,10)}.json`;a.click();toast("Exported")}
