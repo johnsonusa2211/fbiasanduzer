@@ -410,8 +410,14 @@ const GD={tc:null,tk:null,_r:null,folderId:null,
   _saveToken(tk,expiresIn){this.tk=tk;try{localStorage.setItem(GD_TK_KEY,tk);localStorage.setItem(GD_EXP_KEY,String(Date.now()+(expiresIn||3500)*1000))}catch{}},
   _clearToken(){this.tk=null;try{localStorage.removeItem(GD_TK_KEY);localStorage.removeItem(GD_EXP_KEY)}catch{}},
   init(c){if(!c)return Promise.resolve(false);if(this._r)return this._r;this._r=new Promise(r=>{const setup=()=>{this.tc=google.accounts.oauth2.initTokenClient({client_id:c,scope:"https://www.googleapis.com/auth/drive.file",callback:()=>{}});this._loadCached();r(true)};if(window.google?.accounts?.oauth2){setup();return}const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=()=>setup();s.onerror=()=>r(false);document.head.appendChild(s)});return this._r},
-  auth(silent){return new Promise((r,j)=>{if(!this.tc)return j("err");this.tc.callback=x=>{if(x.error){if(silent)return j("silent_fail");return j(x.error)}this._saveToken(x.access_token,x.expires_in);r(this.tk)};this.tc.requestAccessToken({prompt:silent?"none":"consent"})})},
-  async t(){if(this.tk){const exp=localStorage.getItem(GD_EXP_KEY);if(exp&&Date.now()<parseInt(exp))return this.tk}try{await this.auth(true);return this.tk}catch{await this.auth(false);return this.tk}},
+  auth(){return new Promise((r,j)=>{if(!this.tc)return j("err");this.tc.callback=x=>{if(x.error)return j(x.error);this._saveToken(x.access_token,x.expires_in);r(this.tk)};try{this.tc.requestAccessToken({prompt:this.tk?"":"consent"})}catch(e){j(e)}})},
+  async t(){
+    // 1. Return cached token if still valid
+    if(this.tk){const exp=localStorage.getItem(GD_EXP_KEY);if(exp&&Date.now()<parseInt(exp))return this.tk}
+    // 2. Token expired or missing — clear stale state
+    this._clearToken();
+    // 3. Request new token (prompt:"consent" since no valid tk)
+    await this.auth();return this.tk},
 
   // Find or create images folder
   async getFolder(){
@@ -449,8 +455,8 @@ const GD={tc:null,tk:null,_r:null,folderId:null,
   async push(d){const t=await this.t(),ex=await this.find(),b=JSON.stringify(d,null,2);if(ex){await fetch(`https://www.googleapis.com/upload/drive/v3/files/${ex.id}?uploadType=media`,{method:"PATCH",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:b});return}const fd=new FormData();fd.append("metadata",new Blob([JSON.stringify({name:GDN,mimeType:"application/json"})],{type:"application/json"}));fd.append("file",new Blob([b],{type:"application/json"}));await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{Authorization:`Bearer ${t}`},body:fd})},
   async pull(){const t=await this.t(),f=await this.find();if(!f)return null;return(await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media`,{headers:{Authorization:`Bearer ${t}`}})).json()}
 };
-async function gPush(){gSt="syncing";R();try{await GD.init(D.settings.gdCid);await GD.push(D);gSt="ok";toast("Pushed to Drive")}catch{gSt="err";toast("Sync failed","error")}R();setTimeout(()=>{gSt="idle";R()},3e3)}
-async function gPull(){gSt="syncing";R();try{await GD.init(D.settings.gdCid);const r=await GD.pull();if(r?.trades){migrate(r);D=r;save();gSt="ok";toast(`Pulled ${r.trades.length} trades`)}else{gSt="idle";toast("No backup","warn")}}catch{gSt="err";toast("Pull failed","error")}R();setTimeout(()=>{gSt="idle";R()},3e3)}
+async function gPush(){gSt="syncing";R();try{await GD.init(D.settings.gdCid);await GD.push(D);gSt="ok";toast("Pushed to Drive")}catch(e){gSt="err";toast(e==="err"?"Auth expired — tap again":"Sync failed","error")}R();setTimeout(()=>{gSt="idle";R()},3e3)}
+async function gPull(){gSt="syncing";R();try{await GD.init(D.settings.gdCid);const r=await GD.pull();if(r?.trades){migrate(r);D=r;save();gSt="ok";toast(`Pulled ${r.trades.length} trades`)}else{gSt="idle";toast("No backup","warn")}}catch(e){gSt="err";toast(e==="err"?"Auth expired — tap again":"Pull failed","error")}R();setTimeout(()=>{gSt="idle";R()},3e3)}
 
 // ═══ Ring ═══
 function ringBW(v,sz=40){const sw=2,r=(sz-sw)/2,c=2*Math.PI*r,o=c-(v/100)*c;
