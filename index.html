@@ -276,6 +276,8 @@ select.fi { cursor: pointer; -webkit-appearance: none }
 .ith { position: relative; width: 72px; height: 72px; border-radius: 10px; overflow: hidden; cursor: pointer; flex-shrink: 0; border: 1px solid var(--line2); background: var(--faint); transition: transform .15s }
 .ith:active { transform: scale(.95) }
 .ith img { width: 100%; height: 100%; object-fit: cover }
+.ith.loading { background: linear-gradient(90deg, var(--faint) 25%, var(--line3) 50%, var(--faint) 75%); background-size: 200% 100%; animation: shimmer 1.5s ease infinite }
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 .ix { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; background: rgba(0,0,0,.65); border: none; color: #fff; border-radius: 50%; font-size: 10px; cursor: pointer; line-height: 20px; padding: 0; backdrop-filter: blur(4px) }
 .ip { width: 72px; height: 72px; border-radius: 10px; border: 1.5px dashed var(--dim); background: transparent; color: var(--dim); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; gap: 2px; flex-shrink: 0; transition: border-color .2s }
 .ip:hover { border-color: var(--accent) }
@@ -421,8 +423,44 @@ function allAccountStats(){
 function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,6)}
 function fmt(d){return new Date(d).toLocaleDateString("en-US",{month:"short",day:"numeric"})}
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;")}
-function imUrl(im){return im.driveId?`https://lh3.googleusercontent.com/d/${im.driveId}=w400`:im.data||""}
-function imUrlFull(im){return im.driveId?`https://lh3.googleusercontent.com/d/${im.driveId}=w1600`:im.data||""}
+// ─── Authenticated Drive Image Loading ───
+// Instead of relying on public URLs (which fail cross-device),
+// fetch images via Drive API with auth token → blob URL cache
+const _blobCache=new Map();
+const _blobLoading=new Set();
+function imUrl(im){
+  if(!im.driveId)return im.data||"";
+  if(_blobCache.has(im.driveId))return _blobCache.get(im.driveId);
+  _queueDriveImg(im.driveId);
+  return"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Crect width='400' height='400' fill='%23f0f0f0'/%3E%3C/svg%3E"}
+function imUrlFull(im){
+  if(!im.driveId)return im.data||"";
+  if(_blobCache.has("full_"+im.driveId))return _blobCache.get("full_"+im.driveId);
+  if(_blobCache.has(im.driveId))return _blobCache.get(im.driveId);
+  _queueDriveImg(im.driveId,true);
+  return _blobCache.get(im.driveId)||"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='800'%3E%3Crect width='800' height='800' fill='%23f0f0f0'/%3E%3C/svg%3E"}
+async function _queueDriveImg(driveId,full){
+  const key=full?"full_"+driveId:driveId;
+  if(_blobLoading.has(key)||_blobCache.has(key))return;
+  if(!GD.tk)return;// no token yet
+  _blobLoading.add(key);
+  try{
+    const t=await GD.t();
+    const r=await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`,{headers:{Authorization:`Bearer ${t}`}});
+    if(!r.ok)throw"fetch failed";
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    _blobCache.set(driveId,url);
+    if(full)_blobCache.set("full_"+driveId,url);
+    R();// re-render to show loaded image
+  }catch(e){
+    console.warn("Drive image load failed:",driveId,e);
+    // Fallback: try public URL (in case permission was set)
+    const pub=`https://lh3.googleusercontent.com/d/${driveId}=w800`;
+    _blobCache.set(driveId,pub);
+    if(full)_blobCache.set("full_"+driveId,pub);
+    R();
+  }finally{_blobLoading.delete(key)}}
 
 // ─── Theme ───
 function setTheme(t){D.settings.theme=t;save();document.documentElement.setAttribute("data-theme",t);
@@ -477,9 +515,10 @@ const GD={tc:null,tk:null,_r:null,folderId:null,
       xhr.upload.onprogress=e=>{if(e.lengthComputable&&onProgress)onProgress(Math.round(e.loaded/e.total*90))};
       xhr.onload=()=>{if(onProgress)onProgress(95);try{res(JSON.parse(xhr.responseText))}catch{rej("parse error")}};
       xhr.onerror=()=>rej("upload error");xhr.send(fd)});
-    // Make publicly viewable
+    // Make publicly viewable (fallback for non-authenticated viewing)
     if(onProgress)onProgress(98);
-    await fetch(`https://www.googleapis.com/drive/v3/files/${d.id}/permissions`,{method:"POST",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:JSON.stringify({role:"reader",type:"anyone"})});
+    try{const pr=await fetch(`https://www.googleapis.com/drive/v3/files/${d.id}/permissions`,{method:"POST",headers:{Authorization:`Bearer ${t}`,"Content-Type":"application/json"},body:JSON.stringify({role:"reader",type:"anyone"})});
+    if(!pr.ok)console.warn("Permission set failed:",await pr.text())}catch(e){console.warn("Permission set error:",e)}
     if(onProgress)onProgress(100);
     return{driveId:d.id,name:file.name}},
 
@@ -539,10 +578,10 @@ function corrCalc(){const res=[],seen=new Set();Object.entries(CR).forEach(([p,c
 function R(){
   let h="";
   if(tMsg)h+=`<div class="toast">${esc(tMsg)}</div>`;
-  if(ivState){const iv=ivState,im=iv.images[iv.idx],src=imUrlFull(im),multi=iv.images.length>1;
+  if(ivState){const iv=ivState,im=iv.images[iv.idx],src=imUrlFull(im),multi=iv.images.length>1,isLoading=im.driveId&&!_blobCache.has(im.driveId)&&!_blobCache.has("full_"+im.driveId);
     h+=`<div class="img-viewer"><div class="iv-backdrop" onclick="ivState=null;R()"></div>`;
-    h+=`<div class="iv-header"><div class="iv-counter">${iv.idx+1} / ${iv.images.length}</div><button class="iv-close" onclick="ivState=null;R()">✕</button></div>`;
-    h+=`<div class="iv-body" onclick="ivState=null;R()"><img src="${src}" onclick="event.stopPropagation()">`;
+    h+=`<div class="iv-header"><div class="iv-counter">${iv.idx+1} / ${iv.images.length}${isLoading?' <span style="opacity:.5;font-size:10px">loading…</span>':""}</div><button class="iv-close" onclick="ivState=null;R()">✕</button></div>`;
+    h+=`<div class="iv-body" onclick="ivState=null;R()">${isLoading?'<svg width="40" height="40" viewBox="0 0 24 24" fill="none" style="animation:upl-spin 1s linear infinite;position:absolute"><circle cx="12" cy="12" r="10" stroke="rgba(255,255,255,.15)" stroke-width="2"/><path d="M12 2a10 10 0 0 1 10 10" stroke="rgba(255,255,255,.6)" stroke-width="2" stroke-linecap="round"/></svg>':""}<img src="${src}" onclick="event.stopPropagation()" style="${isLoading?"opacity:0":"opacity:1;transition:opacity .3s"}">`;
     if(multi){h+=`<button class="iv-nav prev" onclick="event.stopPropagation();ivState.idx=(ivState.idx-1+ivState.images.length)%ivState.images.length;R()">‹</button>`;
     h+=`<button class="iv-nav next" onclick="event.stopPropagation();ivState.idx=(ivState.idx+1)%ivState.images.length;R()">›</button>`}
     h+=`</div>`;
@@ -612,7 +651,7 @@ function pgLog(){let h=`<div class="hl">Trades</div><div style="display:flex;gap
       if(t.usePartial){h+=`<div class="teg" style="margin-top:8px">${t.tp1?`<div><div class="tel">TP1</div><div class="tev">${esc(t.tp1)}</div></div>`:""}<div><div class="tel">Leg 1 (${t.partialPct||50}%)</div><div class="tev">${t.leg1Result||"—"}${t.leg1Exit?" @ "+esc(t.leg1Exit):""}</div></div><div><div class="tel">Leg 2 (${100-parseInt(t.partialPct||50)}%)</div><div class="tev">${t.leg2Result||"—"}${t.leg2Exit?" @ "+esc(t.leg2Exit):""}</div></div>${t.combinedR!==""&&t.combinedR!==null?`<div><div class="tel">Combined R</div><div class="tev" style="font-weight:700">${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R</div></div>`:""}</div>`}
       // Dollar P&L — show actualPL if set, else dollarPL
       if(t.dollarPL!==null&&t.dollarPL!==undefined){const _isActual=t.actualPL&&!isNaN(parseFloat(t.actualPL));h+=`<div style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600">${t.dollarPL>=0?"+":""}$${t.dollarPL.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}${_isActual?' <span style="font-size:9px;color:var(--sub);font-weight:500">MT5</span>':""}</div>`}
-      h+=`${t.notes?`<div style="font-style:italic;color:var(--muted)">"${esc(t.notes)}"</div>`:""}${t.images?.length?`<div style="display:flex;gap:6px;margin-top:10px">${t.images.map((im,ii)=>`<img src="${imUrl(im)}" style="height:44px;border-radius:6px;cursor:pointer;border:1px solid var(--line2)" onclick="event.stopPropagation();ivState={images:D.trades.find(x=>x.id==='${t.id}').images,idx:${ii}};R()">`).join("")}</div>`:""}
+      h+=`${t.notes?`<div style="font-style:italic;color:var(--muted)">"${esc(t.notes)}"</div>`:""}${t.images?.length?`<div style="display:flex;gap:6px;margin-top:10px">${t.images.map((im,ii)=>{const url=imUrl(im),ld=im.driveId&&!_blobCache.has(im.driveId);return`<div style="height:44px;width:44px;border-radius:6px;overflow:hidden;flex-shrink:0;border:1px solid var(--line2);${ld?"background:linear-gradient(90deg,var(--faint) 25%,var(--line3) 50%,var(--faint) 75%);background-size:200% 100%;animation:shimmer 1.5s ease infinite":""}"><img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="event.stopPropagation();ivState={images:D.trades.find(x=>x.id==='${t.id}').images,idx:${ii}};R()"></div>`}).join("")}</div>`:""}
       <div class="ta"><button class="btn-t" onclick="event.stopPropagation();editId='${t.id}';go('new')">Edit</button><button class="btn-t" style="color:var(--text)" onclick="event.stopPropagation();del('${t.id}')">Delete</button></div></div>`}
     h+=`</div>`});h+=`</div>`;return h}
 
@@ -672,7 +711,7 @@ function pgForm(){
 
   // Images
   h+=`<hr class="sr"><div class="slbl">Screenshots ${hasDrive?'<span style="color:var(--muted);font-weight:400;letter-spacing:1px">· Drive ☁</span>':'<span style="color:var(--muted);font-weight:400;letter-spacing:1px">· Local</span>'}</div>
-    <div class="ir">${(f.images||[]).map((im,i)=>`<div class="ith"><img src="${imUrl(im)}" onclick="event.stopPropagation();ivState={images:window._f.images,idx:${i}};R()"><button class="ix" onclick="event.stopPropagation();rmI(${i})">✕</button></div>`).join("")}${imgUploading?`<div class="upl-wrap"><div class="upl-bg"></div><div class="upl-bar" style="width:${uplPct}%"></div><div class="upl-inner"><svg class="upl-ring" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="var(--dim)" stroke-width="2"/><path d="M12 2a10 10 0 0 1 10 10" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/></svg><span class="upl-pct">${uplPct}%</span></div></div>`:`<label class="ip"><span style="font-size:18px">+</span>Add<input type="file" accept="image/*" multiple class="hid" onchange="addI(this)"></label>`}
+    <div class="ir">${(f.images||[]).map((im,i)=>{const url=imUrl(im),isLoading=im.driveId&&!_blobCache.has(im.driveId);return`<div class="ith${isLoading?" loading":""}"><img src="${url}" onclick="event.stopPropagation();ivState={images:window._f.images,idx:${i}};R()"><button class="ix" onclick="event.stopPropagation();rmI(${i})">✕</button></div>`}).join("")}${imgUploading?`<div class="upl-wrap"><div class="upl-bg"></div><div class="upl-bar" style="width:${uplPct}%"></div><div class="upl-inner"><svg class="upl-ring" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="var(--dim)" stroke-width="2"/><path d="M12 2a10 10 0 0 1 10 10" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/></svg><span class="upl-pct">${uplPct}%</span></div></div>`:`<label class="ip"><span style="font-size:18px">+</span>Add<input type="file" accept="image/*" multiple class="hid" onchange="addI(this)"></label>`}
     </div>`;
 
   h+=`<hr class="sr dk"><div class="slbl">Result</div>`;
