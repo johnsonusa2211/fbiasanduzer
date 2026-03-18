@@ -442,12 +442,17 @@ function imUrlFull(im){
 async function _queueDriveImg(driveId,full){
   const key=full?"full_"+driveId:driveId;
   if(_blobLoading.has(key)||_blobCache.has(key))return;
-  if(!GD.tk)return;// no token yet
+  // Try to get token — init if needed, but never trigger auth popup for images
+  if(!GD.tk&&D.settings.gdCid){try{await GD.init(D.settings.gdCid)}catch{}}
+  if(!GD.tk)return;// still no token — user hasn't signed in yet
   _blobLoading.add(key);
   try{
-    const t=await GD.t();
+    const t=GD.tk;// use current token directly — don't call t() which may popup
     const r=await fetch(`https://www.googleapis.com/drive/v3/files/${driveId}?alt=media`,{headers:{Authorization:`Bearer ${t}`}});
-    if(!r.ok)throw"fetch failed";
+    if(r.status===401||r.status===403){
+      // Token expired or no access — try public URL
+      throw"auth_fail"}
+    if(!r.ok)throw"fetch failed: "+r.status;
     const blob=await r.blob();
     const url=URL.createObjectURL(blob);
     _blobCache.set(driveId,url);
@@ -455,7 +460,7 @@ async function _queueDriveImg(driveId,full){
     R();// re-render to show loaded image
   }catch(e){
     console.warn("Drive image load failed:",driveId,e);
-    // Fallback: try public URL (in case permission was set)
+    // Fallback: try public URL (permission was set at upload)
     const pub=`https://lh3.googleusercontent.com/d/${driveId}=w800`;
     _blobCache.set(driveId,pub);
     if(full)_blobCache.set("full_"+driveId,pub);
@@ -555,9 +560,11 @@ function startAutoSync(){
   setTimeout(()=>_autoSync(),2000);
   // Poll every 30 seconds
   _syncInterval=setInterval(()=>_autoSync(),30000)}
+// Initialize Drive on page load (restores cached token → enables image loading)
+if(D.settings.gdCid){GD.init(D.settings.gdCid).then(ok=>{if(ok&&GD.tk)R()})}
 // Start auto-sync and restart on visibility change (phone wakes up)
 startAutoSync();
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)setTimeout(()=>_autoSync(),1000)});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){if(D.settings.gdCid&&!GD.tk)GD.init(D.settings.gdCid).then(()=>R());setTimeout(()=>_autoSync(),1000)}});
 
 // ═══ Ring ═══
 function ringBW(v,sz=40){const sw=2,r=(sz-sw)/2,c=2*Math.PI*r,o=c-(v/100)*c;
@@ -1561,7 +1568,11 @@ async function addI(el){
       imgUploading=true;uplPct=0;R();
       try{
         await GD.init(D.settings.gdCid);
+        // Read file as blob URL BEFORE uploading so it's cached instantly
+        const localUrl=URL.createObjectURL(f);
         const res=await GD.uploadImage(f,pct=>{uplPct=pct;R()});
+        // Cache the blob URL so image shows immediately (no re-fetch needed)
+        _blobCache.set(res.driveId,localUrl);
         window._f.images.push({id:uid(),name:res.name,driveId:res.driveId});
         toast("Image uploaded ☁");
       }catch(e){
