@@ -326,21 +326,35 @@ function migrate(d){
   d.settings.ftmoAccounts.forEach(a=>{const da=defAccount();Object.keys(da).forEach(k=>{if(a[k]===undefined)a[k]=da[k]})});
   if(!d.settings.goal)d.settings.goal={enabled:false,target:100000,startDate:"",payouts:[]};
   const dg=defSettings().goal;Object.keys(dg).forEach(k=>{if(d.settings.goal[k]===undefined)d.settings.goal[k]=dg[k]});
-  (d.trades||[]).forEach(t=>{if(t.usePartial===undefined)t.usePartial=false;if(t.partialPct===undefined)t.partialPct="50";if(t.partialRR===undefined)t.partialRR="1.0";if(t.tp1===undefined)t.tp1="";if(t.leg1Result===undefined)t.leg1Result="";if(t.leg2Result===undefined)t.leg2Result="";if(t.combinedR===undefined)t.combinedR="";if(t.dollarPL===undefined)t.dollarPL=null;if(t.session===undefined)t.session="";if(t.ftmoAccounts===undefined)t.ftmoAccounts=[]})
+  (d.trades||[]).forEach(t=>{if(t.usePartial===undefined)t.usePartial=false;if(t.partialPct===undefined)t.partialPct="50";if(t.partialRR===undefined)t.partialRR="1.0";if(t.tp1===undefined)t.tp1="";if(t.leg1Result===undefined)t.leg1Result="";if(t.leg2Result===undefined)t.leg2Result="";if(t.combinedR===undefined)t.combinedR="";if(t.dollarPL===undefined)t.dollarPL=null;if(t.session===undefined)t.session="";if(t.ftmoAccounts===undefined)t.ftmoAccounts=[];if(t.exitPrice===undefined)t.exitPrice="";if(t.leg1Exit===undefined)t.leg1Exit="";if(t.leg2Exit===undefined)t.leg2Exit="";if(t.riskDollar===undefined)t.riskDollar=""})
 }
 function load(){try{const d=JSON.parse(localStorage.getItem(SK));if(d?.trades){migrate(d);return d}}catch{}const f={trades:[],avoidDays:[],settings:defSettings()};return f}
 function save(){localStorage.setItem(SK,JSON.stringify(D))}
 
 // ─── R Calculation Helpers ───
+function calcRRFromPrices(entry,sl,target,dir){
+  const e=parseFloat(entry),s=parseFloat(sl),t=parseFloat(target);
+  if(isNaN(e)||isNaN(s)||isNaN(t)||e===s)return null;
+  const risk=Math.abs(e-s),reward=dir==="LONG"?(t-e):(e-t);
+  return Math.round((reward/risk)*1000)/1000}
 function calcCombinedR(f){
-  const pct=(parseFloat(f.partialPct)||50)/100,pRR=parseFloat(f.partialRR)||1.0,fullRR=parseFloat(f.rr)||0;
-  let r=0;
-  if(f.leg1Result==="WIN")r+=pct*pRR;else if(f.leg1Result==="LOSS")r-=pct;
-  if(f.leg2Result==="WIN")r+=(1-pct)*fullRR;else if(f.leg2Result==="LOSS")r-=(1-pct);
+  const pct=(parseFloat(f.partialPct)||50)/100;
+  const eV=parseFloat(f.entry),sV=parseFloat(f.sl);
+  if(isNaN(eV)||isNaN(sV)||eV===sV){const pRR=parseFloat(f.partialRR)||1.0,fullRR=parseFloat(f.rr)||0;let r=0;if(f.leg1Result==="WIN")r+=pct*pRR;else if(f.leg1Result==="LOSS")r-=pct;if(f.leg2Result==="WIN")r+=(1-pct)*fullRR;else if(f.leg2Result==="LOSS")r-=(1-pct);return Math.round(r*1000)/1000}
+  const risk=Math.abs(eV-sV);let r=0;
+  const l1=parseFloat(f.leg1Exit);
+  if(!isNaN(l1)){r+=pct*((f.direction==="LONG"?(l1-eV):(eV-l1))/risk)}
+  else if(f.leg1Result==="WIN"){const tp1=parseFloat(f.tp1);if(!isNaN(tp1))r+=pct*((f.direction==="LONG"?(tp1-eV):(eV-tp1))/risk);else r+=pct*(parseFloat(f.partialRR)||1)}
+  else if(f.leg1Result==="LOSS")r-=pct;
+  const l2=parseFloat(f.leg2Exit);
+  if(!isNaN(l2)){r+=(1-pct)*((f.direction==="LONG"?(l2-eV):(eV-l2))/risk)}
+  else if(f.leg2Result==="WIN"){const tp=parseFloat(f.tp);if(!isNaN(tp))r+=(1-pct)*((f.direction==="LONG"?(tp-eV):(eV-tp))/risk);else r+=(1-pct)*(parseFloat(f.rr)||0)}
+  else if(f.leg2Result==="LOSS")r-=(1-pct);
   return Math.round(r*1000)/1000
 }
 function tradeR(t){
   if(t.usePartial&&t.combinedR!==""&&t.combinedR!==null&&t.combinedR!==undefined)return parseFloat(t.combinedR)||0;
+  if(t.exitPrice){const rr=calcRRFromPrices(t.entry,t.sl,t.exitPrice,t.direction);if(rr!==null)return rr}
   if(t.result==="WIN")return parseFloat(t.rr)||0;if(t.result==="LOSS")return-1;return 0
 }
 function ftmoStats(){
@@ -355,7 +369,7 @@ function ftmoStatsForAccount(s,acctId){
   // If acctId provided, filter to trades tagged for this account (or all if none tagged)
   if(acctId){tr=tr.filter(t=>!t.ftmoAccounts||t.ftmoAccounts.length===0||t.ftmoAccounts.includes(acctId))}
   let cum=0,peak=acct,daily={};
-  tr.forEach(t=>{const r=tradeR(t),pl=r*rPer;cum+=pl;const bal=acct+cum;if(bal>peak)peak=bal;
+  tr.forEach(t=>{const r=tradeR(t),tRisk=t.riskDollar&&parseFloat(t.riskDollar)>0?parseFloat(t.riskDollar):rPer,pl=r*tRisk;cum+=pl;const bal=acct+cum;if(bal>peak)peak=bal;
     const dk=t.date||"";if(dk){if(!daily[dk])daily[dk]={pl:0,n:0,cum:0};daily[dk].pl+=pl;daily[dk].n++}});
   let rc=0;Object.keys(daily).sort().forEach(k=>{rc+=daily[k].pl;daily[k].cum=rc});
   const bal=acct+cum,tdd=peak>0?((peak-bal)/acct)*100:0;
@@ -498,11 +512,11 @@ function pgLog(){let h=`<div class="hl">Trades</div><div style="display:flex;gap
   if(!tr.length)return h+`<div class="eb"><div class="hl-sm" style="margin-bottom:12px">No trades yet</div><p class="bt" style="margin-bottom:24px">Start logging to see history.</p><button class="btn-a" onclick="go('new')">Log a Trade</button></div>`;
   h+=`<div style="border-top:1px solid var(--line)">`;
   tr.forEach(t=>{
-    const tR=tradeR(t),rDisp=t.usePartial&&t.combinedR!==""?`${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R`:t.rr?`${t.rr}R`:"";
+    const tR=tradeR(t),rDisp=t.usePartial&&t.combinedR!==""?`${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R`:tR!==0?`${tR>=0?"+":""}${tR.toFixed(2)}R`:"";
     h+=`<div class="ti" onclick="expId=expId==='${t.id}'?null:'${t.id}';R()"><div class="tt"><div class="tl"><div class="rd ${t.result}"></div><span class="tp">${t.pair}</span>${t.usePartial?`<span class="pbadge">P</span>`:""}${(t.ftmoAccounts||[]).length>0?`<span class="pbadge">${t.ftmoAccounts.length}A</span>`:""}<span style="font-size:11px;color:var(--muted);font-weight:500">${t.direction}</span>${t.session?`<span style="font-size:9px;color:var(--dim);font-weight:600;letter-spacing:1px;text-transform:uppercase">${t.session==="london"?"LDN":t.session==="newyork"?"NY-DST":"NY-STD"}</span>`:""}</div><div class="tm">${t.date?fmt(t.date):""} ${rDisp?`· ${rDisp}`:""}</div></div>`;
-    if(expId===t.id){h+=`<div class="te"><div class="teg">${t.entry?`<div><div class="tel">Entry</div><div class="tev">${esc(t.entry)}</div></div>`:""}${t.sl?`<div><div class="tel">SL</div><div class="tev">${esc(t.sl)}</div></div>`:""}${t.tp?`<div><div class="tel">TP</div><div class="tev">${esc(t.tp)}</div></div>`:""}${t.occH?`<div><div class="tel">Zone H</div><div class="tev">${esc(t.occH)}</div></div>`:""}${t.occL?`<div><div class="tel">Zone L</div><div class="tev">${esc(t.occL)}</div></div>`:""}</div>`;
+    if(expId===t.id){h+=`<div class="te"><div class="teg">${t.entry?`<div><div class="tel">Entry</div><div class="tev">${esc(t.entry)}</div></div>`:""}${t.sl?`<div><div class="tel">SL</div><div class="tev">${esc(t.sl)}</div></div>`:""}${t.tp?`<div><div class="tel">TP</div><div class="tev">${esc(t.tp)}</div></div>`:""}${t.exitPrice?`<div><div class="tel">Exit</div><div class="tev">${esc(t.exitPrice)}</div></div>`:""}${t.occH?`<div><div class="tel">Zone H</div><div class="tev">${esc(t.occH)}</div></div>`:""}${t.occL?`<div><div class="tel">Zone L</div><div class="tev">${esc(t.occL)}</div></div>`:""}${t.riskDollar?`<div><div class="tel">Risk $</div><div class="tev">$${esc(t.riskDollar)}</div></div>`:""}</div>`;
       // Partial TP details
-      if(t.usePartial){h+=`<div class="teg" style="margin-top:8px">${t.tp1?`<div><div class="tel">TP1</div><div class="tev">${esc(t.tp1)}</div></div>`:""}<div><div class="tel">Leg 1 (${t.partialPct||50}%)</div><div class="tev">${t.leg1Result||"—"}</div></div><div><div class="tel">Leg 2 (${100-parseInt(t.partialPct||50)}%)</div><div class="tev">${t.leg2Result||"—"}</div></div>${t.combinedR!==""&&t.combinedR!==null?`<div><div class="tel">Combined R</div><div class="tev" style="font-weight:700">${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R</div></div>`:""}</div>`}
+      if(t.usePartial){h+=`<div class="teg" style="margin-top:8px">${t.tp1?`<div><div class="tel">TP1</div><div class="tev">${esc(t.tp1)}</div></div>`:""}<div><div class="tel">Leg 1 (${t.partialPct||50}%)</div><div class="tev">${t.leg1Result||"—"}${t.leg1Exit?" @ "+esc(t.leg1Exit):""}</div></div><div><div class="tel">Leg 2 (${100-parseInt(t.partialPct||50)}%)</div><div class="tev">${t.leg2Result||"—"}${t.leg2Exit?" @ "+esc(t.leg2Exit):""}</div></div>${t.combinedR!==""&&t.combinedR!==null?`<div><div class="tel">Combined R</div><div class="tev" style="font-weight:700">${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R</div></div>`:""}</div>`}
       // Dollar P&L
       if(t.dollarPL!==null&&t.dollarPL!==undefined){h+=`<div style="margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600">${t.dollarPL>=0?"+":""}$${t.dollarPL.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>`}
       h+=`${t.notes?`<div style="font-style:italic;color:var(--muted)">"${esc(t.notes)}"</div>`:""}${t.images?.length?`<div style="display:flex;gap:6px;margin-top:10px">${t.images.map(im=>`<img src="${imUrl(im)}" style="height:44px;border-radius:4px;cursor:pointer;border:1px solid var(--line2)" onclick="event.stopPropagation();lbS='${imUrlFull(im).replace(/'/g,"\\'")}';R()">`).join("")}</div>`:""}
@@ -513,7 +527,7 @@ function pgLog(){let h=`<div class="hl">Trades</div><div style="display:flex;gap
 function pgForm(){
   const t=editId?D.trades.find(x=>x.id===editId):null;
   const activeAccts=D.settings.ftmoAccounts.filter(a=>a.enabled);
-  const f=window._f||(window._f=t?{...t,checklist:{...t.checklist},images:[...(t.images||[])],ftmoAccounts:[...(t.ftmoAccounts||[])]}:{date:new Date().toISOString().slice(0,10),pair:"EURUSD",session:"london",direction:"LONG",result:"",rr:"",entry:"",sl:"",tp:"",checklist:{},notes:"",images:[],occH:"",occL:"",corrLinked:false,corrPair:"",corrNotes:"",usePartial:D.settings.defaultPartial||false,partialPct:String(D.settings.defaultPartialPct||50),partialRR:String(D.settings.defaultPartialRR||1.0),tp1:"",leg1Result:"",leg2Result:"",combinedR:"",dollarPL:null,ftmoAccounts:activeAccts.map(a=>a.id)});
+  const f=window._f||(window._f=t?{...t,checklist:{...t.checklist},images:[...(t.images||[])],ftmoAccounts:[...(t.ftmoAccounts||[])]}:{date:new Date().toISOString().slice(0,10),pair:"EURUSD",session:"london",direction:"LONG",result:"",rr:"",entry:"",sl:"",tp:"",checklist:{},notes:"",images:[],occH:"",occL:"",corrLinked:false,corrPair:"",corrNotes:"",usePartial:D.settings.defaultPartial||false,partialPct:String(D.settings.defaultPartialPct||50),partialRR:String(D.settings.defaultPartialRR||1.0),tp1:"",leg1Result:"",leg2Result:"",combinedR:"",dollarPL:null,ftmoAccounts:activeAccts.map(a=>a.id),exitPrice:"",leg1Exit:"",leg2Exit:"",riskDollar:""});
   const dn=new Date(f.date+"T12:00:00").toLocaleDateString("en-US",{weekday:"long"}),isAv=D.avoidDays.includes(dn),chk=CK.filter(c=>f.checklist[c.id]).length,co=CR[f.pair]||[];
   const hasDrive=!!D.settings.gdCid;
   let h=`<div class="hl">${editId?"Edit Trade":"New Trade"}</div>`;
@@ -528,20 +542,31 @@ function pgForm(){
     h+=`<button class="sp" style="font-size:10px;color:var(--dim)" onclick="selAllAccts()">All</button></div></div>`;
   }
 
-  h+=`<hr class="sr"><div class="slbl">Price Levels</div><div class="fg">${fi("Zone High","occH",f.occH)}${fi("Zone Low","occL",f.occL)}${fi("Entry","entry",f.entry)}${fi("Stop Loss","sl",f.sl)}${fi("Take Profit","tp",f.tp)}${fi("R:R (Full)","rr",f.rr)}</div>`;
+  const _autoRR=calcRRFromPrices(f.entry,f.sl,f.tp,f.direction);if(_autoRR!==null)f.rr=String(_autoRR);
+  h+=`<hr class="sr"><div class="slbl">Price Levels</div><div class="fg">${fi("Zone High","occH",f.occH)}${fi("Zone Low","occL",f.occL)}${fi("Entry","entry",f.entry)}${fi("Stop Loss","sl",f.sl)}${fi("Take Profit","tp",f.tp)}${fi("Risk ($)","riskDollar",f.riskDollar)}</div>`;
+  if(_autoRR!==null)h+=`<div style="margin-top:12px;padding:12px 16px;border:1px solid var(--line2);text-align:center"><span class="fl">R:R (Full) — Auto</span><div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;margin-top:4px">1:${_autoRR.toFixed(2)}</div></div>`;
 
   // ─── Partial TP ───
   const pp=f.usePartial;
   h+=`<hr class="sr"><div class="slbl">Partial TP (1:1 System)</div><label style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:16px" onclick="uf('usePartial',!window._f.usePartial)"><div class="cc" style="width:20px;height:20px;${pp?"background:var(--accent);border-color:var(--accent);color:var(--accent-text)":""}">${pp?"✓":""}</div><span style="font-size:13px;color:${pp?"var(--text)":"var(--muted)"}">Split into 2 legs</span></label>`;
   if(pp){
-    // Auto-calc TP1
-    const eV=parseFloat(f.entry),sV=parseFloat(f.sl),pRR=parseFloat(f.partialRR)||1.0;
-    let tp1Auto="";
-    if(!isNaN(eV)&&!isNaN(sV)&&eV!==sV){const rd=Math.abs(eV-sV);tp1Auto=f.direction==="LONG"?(eV+pRR*rd).toFixed(5):(eV-pRR*rd).toFixed(5);if(f.tp1!==tp1Auto){f.tp1=tp1Auto}}
-    h+=`<div class="fg"><div><label class="fl">Close %</label><input type="number" class="fi" value="${f.partialPct}" min="10" max="90" step="10" onchange="uf('partialPct',this.value)"></div><div><label class="fl">TP1 R:R</label><input type="number" class="fi" value="${f.partialRR}" min="0.5" max="3" step="0.1" onchange="uf('partialRR',this.value)"></div></div>`;
-    h+=`<div style="margin-top:12px"><label class="fl">TP1 Price (auto)</label><input class="fi fi-ro" value="${f.tp1||"enter Entry & SL"}" readonly></div>`;
-    h+=`<div style="margin-top:20px"><label class="fl">Leg 1 — ${f.partialPct}% @ 1:${pRR}</label><div class="rg">${["WIN","LOSS","BE"].map(r=>`<button class="rp ${f.leg1Result===r?r[0]:""}" onclick="uf('leg1Result','${r}')">${r==="BE"?"BE":r}</button>`).join("")}</div></div>`;
-    h+=`<div style="margin-top:12px"><label class="fl">Leg 2 — ${100-parseInt(f.partialPct||50)}% @ Full TP</label><div class="rg">${["WIN","LOSS","BE"].map(r=>`<button class="rp ${f.leg2Result===r?r[0]:""}" onclick="uf('leg2Result','${r}')">${r==="BE"?"BE":r}</button>`).join("")}</div></div>`;
+    const _tp1RR=calcRRFromPrices(f.entry,f.sl,f.tp1,f.direction);if(_tp1RR!==null)f.partialRR=String(_tp1RR);
+    h+=`<div class="fg"><div><label class="fl">Close %</label><input type="number" class="fi" value="${f.partialPct}" min="10" max="90" step="10" onchange="uf('partialPct',this.value)"></div><div><label class="fl">TP1 Price</label><input type="text" class="fi" value="${esc(f.tp1||"")}" placeholder="—" onchange="uf('tp1',this.value)"></div></div>`;
+    if(_tp1RR!==null)h+=`<div style="margin-top:8px;font-size:12px;color:var(--sub);font-family:'JetBrains Mono',monospace">TP1 R:R = 1:${_tp1RR.toFixed(2)}</div>`;
+    // Leg 1 exit
+    const _l1RR=calcRRFromPrices(f.entry,f.sl,f.leg1Exit,f.direction);
+    if(_l1RR!==null){if(Math.abs(_l1RR)<0.05)f.leg1Result="BE";else f.leg1Result=_l1RR>0?"WIN":"LOSS"}
+    h+=`<div style="margin-top:20px"><label class="fl">Leg 1 — ${f.partialPct}% Exit Price</label><input type="text" class="fi" value="${esc(f.leg1Exit||"")}" placeholder="Exit price" onchange="uf('leg1Exit',this.value)" style="margin-bottom:8px">`;
+    if(_l1RR!==null)h+=`<div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:${_l1RR>=0?"var(--text)":"var(--muted)"};font-weight:600">${f.leg1Result} · ${_l1RR>=0?"+":""}${_l1RR.toFixed(2)}R</div>`;
+    else h+=`<div class="rg">${["WIN","LOSS","BE"].map(r=>`<button class="rp ${f.leg1Result===r?r[0]:""}" onclick="uf('leg1Result','${r}')">${r==="BE"?"BE":r}</button>`).join("")}</div>`;
+    h+=`</div>`;
+    // Leg 2 exit
+    const _l2RR=calcRRFromPrices(f.entry,f.sl,f.leg2Exit,f.direction);
+    if(_l2RR!==null){if(Math.abs(_l2RR)<0.05)f.leg2Result="BE";else f.leg2Result=_l2RR>0?"WIN":"LOSS"}
+    h+=`<div style="margin-top:12px"><label class="fl">Leg 2 — ${100-parseInt(f.partialPct||50)}% Exit Price</label><input type="text" class="fi" value="${esc(f.leg2Exit||"")}" placeholder="Exit price" onchange="uf('leg2Exit',this.value)" style="margin-bottom:8px">`;
+    if(_l2RR!==null)h+=`<div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:${_l2RR>=0?"var(--text)":"var(--muted)"};font-weight:600">${f.leg2Result} · ${_l2RR>=0?"+":""}${_l2RR.toFixed(2)}R</div>`;
+    else h+=`<div class="rg">${["WIN","LOSS","BE"].map(r=>`<button class="rp ${f.leg2Result===r?r[0]:""}" onclick="uf('leg2Result','${r}')">${r==="BE"?"BE":r}</button>`).join("")}</div>`;
+    h+=`</div>`;
     // Combined R display
     if(f.leg1Result&&f.leg2Result){const cr=calcCombinedR(f);f.combinedR=cr;h+=`<div style="margin-top:16px;padding:12px 16px;border:1px solid var(--line);text-align:center"><span class="fl">Combined R</span><div style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;margin-top:4px">${cr>=0?"+":""}${cr.toFixed(2)}R</div></div>`}
   }
@@ -558,7 +583,17 @@ function pgForm(){
       <label class="ip ${imgUploading?"uploading":""}"><span style="font-size:16px">${imgUploading?"↻":"+"}</span>${imgUploading?"…":"Add"}<input type="file" accept="image/*" multiple class="hid" onchange="addI(this)"></label>
     </div>`;
 
-  h+=`<hr class="sr dk"><div class="slbl">Result</div><div class="rg">${["WIN","LOSS","BE"].map(r=>`<button class="rp ${f.result===r?r[0]:""}" onclick="uf('result','${r}')">${r==="BE"?"Break-even":r}</button>`).join("")}</div>`;
+  h+=`<hr class="sr dk"><div class="slbl">Result</div>`;
+  if(!f.usePartial){
+    h+=`<div style="margin-bottom:16px">${fi("Exit Price","exitPrice",f.exitPrice)}</div>`;
+    const _xRR=calcRRFromPrices(f.entry,f.sl,f.exitPrice,f.direction);
+    if(_xRR!==null){if(Math.abs(_xRR)<0.05)f.result="BE";else f.result=_xRR>0?"WIN":"LOSS"}
+    h+=`<div class="rg">${["WIN","LOSS","BE"].map(r=>`<button class="rp ${f.result===r?r[0]:""}" onclick="uf('result','${r}')">${r==="BE"?"Break-even":r}</button>`).join("")}</div>`;
+    if(_xRR!==null)h+=`<div style="margin-top:10px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700">${_xRR>=0?"+":""}${_xRR.toFixed(2)}R</div>`;
+  } else {
+    if(f.leg1Result&&f.leg2Result){const _cr=calcCombinedR(f);if(Math.abs(_cr)<0.05)f.result="BE";else f.result=_cr>0?"WIN":"LOSS"}
+    h+=`<div class="rg">${["WIN","LOSS","BE"].map(r=>`<button class="rp ${f.result===r?r[0]:""}" onclick="uf('result','${r}')">${r==="BE"?"Break-even":r}</button>`).join("")}</div>`;
+  }
   h+=`<hr class="sr"><div class="slbl">Notes</div><textarea class="fi" placeholder="Observations…" onchange="uf('notes',this.value)">${esc(f.notes)}</textarea>`;
   h+=`<div style="display:flex;gap:12px;justify-content:flex-end;margin-top:32px"><button class="btn-b" onclick="editId=null;window._f=null;go('home')">Cancel</button><button class="btn-a" onclick="svTr()">${editId?"Update":"Save"}</button></div>`;
   return h}
@@ -1422,11 +1457,22 @@ async function rmI(i){
 }
 
 function svTr(){const f=window._f;if(!f||!f.result){alert("Select a result");return}f.checklistOk=CK.every(c=>f.checklist[c.id]);
+  // Auto-calc RR from prices
+  const _ar=calcRRFromPrices(f.entry,f.sl,f.tp,f.direction);if(_ar!==null)f.rr=String(_ar);
+  if(f.usePartial){const _pr=calcRRFromPrices(f.entry,f.sl,f.tp1,f.direction);if(_pr!==null)f.partialRR=String(_pr)}
+  // Auto-determine results from exit prices
+  if(f.exitPrice&&!f.usePartial){const xr=calcRRFromPrices(f.entry,f.sl,f.exitPrice,f.direction);if(xr!==null){if(Math.abs(xr)<0.05)f.result="BE";else f.result=xr>0?"WIN":"LOSS"}}
+  if(f.usePartial){
+    if(f.leg1Exit){const lr=calcRRFromPrices(f.entry,f.sl,f.leg1Exit,f.direction);if(lr!==null){if(Math.abs(lr)<0.05)f.leg1Result="BE";else f.leg1Result=lr>0?"WIN":"LOSS"}}
+    if(f.leg2Exit){const lr=calcRRFromPrices(f.entry,f.sl,f.leg2Exit,f.direction);if(lr!==null){if(Math.abs(lr)<0.05)f.leg2Result="BE";else f.leg2Result=lr>0?"WIN":"LOSS"}}
+  }
   // Compute partial TP combined R
-  if(f.usePartial&&f.leg1Result&&f.leg2Result){f.combinedR=calcCombinedR(f)}else if(!f.usePartial){f.combinedR="";f.leg1Result="";f.leg2Result=""}
-  // Compute dollar P&L — use first tagged account's risk, or legacy single
+  if(f.usePartial&&f.leg1Result&&f.leg2Result){f.combinedR=calcCombinedR(f)}else if(!f.usePartial){f.combinedR="";f.leg1Result="";f.leg2Result="";f.leg1Exit="";f.leg2Exit="";f.tp1=""}
+  // Compute dollar P&L — use riskDollar if set, otherwise account-based
+  const riskD=parseFloat(f.riskDollar);
   const taggedAccts=(f.ftmoAccounts||[]).map(aid=>D.settings.ftmoAccounts.find(a=>a.id===aid)).filter(Boolean);
-  if(taggedAccts.length>0){const a=taggedAccts[0];const rPer=a.accountSize*(a.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}
+  if(!isNaN(riskD)&&riskD>0){f.dollarPL=Math.round(tradeR(f)*riskD*100)/100}
+  else if(taggedAccts.length>0){const a=taggedAccts[0];const rPer=a.accountSize*(a.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}
   else{const ft=D.settings.ftmo;if(ft&&ft.enabled){const rPer=ft.accountSize*(ft.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}else{f.dollarPL=null}}
   if(editId){const i=D.trades.findIndex(t=>t.id===editId);if(i>=0)D.trades[i]={...f,id:editId}}else D.trades.push({...f,id:uid()});save();editId=null;window._f=null;tab="log";toast("Saved");R();if(D.settings.gdSync&&D.settings.gdCid)gPush()}
 function del(id){if(!confirm("Delete?"))return;D.trades=D.trades.filter(t=>t.id!==id);save();toast("Deleted","warn");R()}
