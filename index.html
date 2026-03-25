@@ -364,6 +364,7 @@ function migrate(d){
 }
 function load(){try{const d=JSON.parse(localStorage.getItem(SK));if(d?.trades){migrate(d);return d}}catch{}const f={trades:[],avoidDays:[],settings:defSettings()};return f}
 function save(){localStorage.setItem(SK,JSON.stringify(D))}
+function mergeDat(local,remote){const map=new Map();for(const t of(local.trades||[]))map.set(t.id,t);for(const t of(remote.trades||[])){const ex=map.get(t.id);if(!ex||(t.updatedAt||0)>(ex.updatedAt||0))map.set(t.id,t)}const avoidSet=new Set([...(local.avoidDays||[]),...(remote.avoidDays||[])]);return{...local,trades:Array.from(map.values()),avoidDays:Array.from(avoidSet)}}
 
 // ─── R Calculation Helpers ───
 function calcRRFromPrices(entry,sl,target,dir){
@@ -541,8 +542,8 @@ const GD={tc:null,tk:null,_r:null,folderId:null,
 };
 // Track last push time for smart sync
 let _lastPushTime=0;
-async function gPush(silent){if(!silent){gSt="syncing";R()}try{await GD.init(D.settings.gdCid);await GD.push(D);_lastPushTime=Date.now();if(!silent){gSt="ok";toast("Pushed to Drive")}}catch(e){if(!silent){gSt="err";toast(e==="err"?"Auth expired — tap again":"Sync failed","error")}}if(!silent){R();setTimeout(()=>{gSt="idle";R()},3e3)}}
-async function gPull(silent){if(!silent){gSt="syncing";R()}try{await GD.init(D.settings.gdCid);const r=await GD.pull();if(r?.trades){const localCount=D.trades.length,remoteCount=r.trades.length;migrate(r);D=r;save();if(!silent){gSt="ok";toast(`Pulled ${r.trades.length} trades`)}else if(remoteCount!==localCount){toast("Synced from another device")}}_lastPushTime=Date.now();if(!silent&&!(r?.trades)){gSt="idle";toast("No backup","warn")}}catch(e){if(!silent){gSt="err";toast(e==="err"?"Auth expired — tap again":"Pull failed","error")}}if(!silent){R();setTimeout(()=>{gSt="idle";R()},3e3)}else R()}
+async function gPush(silent){if(!silent){gSt="syncing";R()}try{await GD.init(D.settings.gdCid);const _f=await GD.find();if(_f?.modifiedTime){const _rt=new Date(_f.modifiedTime).getTime();if(_rt>_lastPushTime+5000){const _r=await GD.pull();if(_r?.trades){migrate(_r);D=mergeDat(D,_r);save();R()}}}await GD.push(D);_lastPushTime=Date.now();if(!silent){gSt="ok";toast("Pushed to Drive")}}catch(e){if(!silent){gSt="err";toast(e==="err"?"Auth expired — tap again":"Sync failed","error")}}if(!silent){R();setTimeout(()=>{gSt="idle";R()},3e3)}}
+async function gPull(silent){if(!silent){gSt="syncing";R()}try{await GD.init(D.settings.gdCid);const r=await GD.pull();if(r?.trades){const localCount=D.trades.length;migrate(r);D=mergeDat(D,r);save();const merged=D.trades.length;if(!silent){gSt="ok";toast(`Synced — ${merged} trades`)}else if(merged!==localCount){toast("Synced from another device");gPush(true)}}_lastPushTime=Date.now();if(!silent&&!(r?.trades)){gSt="idle";toast("No backup","warn")}}catch(e){if(!silent){gSt="err";toast(e==="err"?"Auth expired — tap again":"Pull failed","error")}}if(!silent){R();setTimeout(()=>{gSt="idle";R()},3e3)}else R()}
 // Auto-sync: pull on load, then poll every 30s for changes from other devices
 async function _autoSync(){
   if(!D.settings.gdSync||!D.settings.gdCid||!GD.tk)return;
@@ -1622,7 +1623,7 @@ function svTr(){const f=window._f;if(!f||!f.result){alert("Select a result");ret
   if(!isNaN(riskD)&&riskD>0){f.dollarPL=Math.round(tradeR(f)*riskD*100)/100}
   else if(taggedAccts.length>0){const a=taggedAccts[0];const rPer=a.accountSize*(a.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}
   else{const ft=D.settings.ftmo;if(ft&&ft.enabled){const rPer=ft.accountSize*(ft.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}else{f.dollarPL=null}}}
-  if(editId){const i=D.trades.findIndex(t=>t.id===editId);if(i>=0)D.trades[i]={...f,id:editId}}else D.trades.push({...f,id:uid()});save();editId=null;window._f=null;tab="log";toast("Saved");R();if(D.settings.gdSync&&D.settings.gdCid)gPush()}
+  if(editId){const i=D.trades.findIndex(t=>t.id===editId);if(i>=0)D.trades[i]={...f,id:editId,updatedAt:Date.now()}}else D.trades.push({...f,id:uid(),updatedAt:Date.now()});save();editId=null;window._f=null;tab="log";toast("Saved");R();if(D.settings.gdSync&&D.settings.gdCid)gPush()}
 function del(id){if(!confirm("Delete?"))return;D.trades=D.trades.filter(t=>t.id!==id);save();toast("Deleted","warn");R()}
 function expJ(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:"application/json"}));a.download=`OCC_${new Date().toISOString().slice(0,10)}.json`;a.click();toast("Exported")}
 function impJ(el){const f=el.files?.[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.trades){migrate(d);D=d;save();toast(`${d.trades.length} trades imported`);R()}}catch{toast("Invalid","error")}};rd.readAsText(f);el.value=""}
