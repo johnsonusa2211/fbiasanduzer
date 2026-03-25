@@ -361,10 +361,26 @@ function migrate(d){
   if(!d.settings.goal)d.settings.goal={enabled:false,target:100000,startDate:"",payouts:[]};
   const dg=defSettings().goal;Object.keys(dg).forEach(k=>{if(d.settings.goal[k]===undefined)d.settings.goal[k]=dg[k]});
   (d.trades||[]).forEach(t=>{if(t.usePartial===undefined)t.usePartial=false;if(t.partialPct===undefined)t.partialPct="50";if(t.partialRR===undefined)t.partialRR="1.0";if(t.tp1===undefined)t.tp1="";if(t.leg1Result===undefined)t.leg1Result="";if(t.leg2Result===undefined)t.leg2Result="";if(t.combinedR===undefined)t.combinedR="";if(t.dollarPL===undefined)t.dollarPL=null;if(t.session===undefined)t.session="";if(t.ftmoAccounts===undefined)t.ftmoAccounts=[];if(t.exitPrice===undefined)t.exitPrice="";if(t.leg1Exit===undefined)t.leg1Exit="";if(t.leg2Exit===undefined)t.leg2Exit="";if(t.riskDollar===undefined)t.riskDollar="";if(t.actualPL===undefined)t.actualPL=""})
+  if(!d.deletedIds)d.deletedIds=[];
 }
-function load(){try{const d=JSON.parse(localStorage.getItem(SK));if(d?.trades){migrate(d);return d}}catch{}const f={trades:[],avoidDays:[],settings:defSettings()};return f}
+function load(){try{const d=JSON.parse(localStorage.getItem(SK));if(d?.trades){migrate(d);return d}}catch{}const f={trades:[],avoidDays:[],deletedIds:[],settings:defSettings()};return f}
 function save(){localStorage.setItem(SK,JSON.stringify(D))}
-function mergeDat(local,remote){const map=new Map();for(const t of(local.trades||[]))map.set(t.id,t);for(const t of(remote.trades||[])){const ex=map.get(t.id);if(!ex||(t.updatedAt||0)>(ex.updatedAt||0))map.set(t.id,t)}const avoidSet=new Set([...(local.avoidDays||[]),...(remote.avoidDays||[])]);return{...local,trades:Array.from(map.values()),avoidDays:Array.from(avoidSet)}}
+function mergeDat(local,remote){
+  // Merge tombstones — union by id, keep newer deletedAt
+  const delMap=new Map();
+  for(const x of(local.deletedIds||[]))delMap.set(x.id,x);
+  for(const x of(remote.deletedIds||[])){const ex=delMap.get(x.id);if(!ex||(x.deletedAt||0)>(ex.deletedAt||0))delMap.set(x.id,x)}
+  // Prune tombstones older than 90 days to prevent unbounded growth
+  const cutoff=Date.now()-90*24*60*60*1000;
+  const deletedIds=Array.from(delMap.values()).filter(x=>(x.deletedAt||0)>cutoff);
+  const deletedSet=new Set(deletedIds.map(x=>x.id));
+  // Merge trades, skipping any tombstoned IDs
+  const map=new Map();
+  for(const t of(local.trades||[]))if(!deletedSet.has(t.id))map.set(t.id,t);
+  for(const t of(remote.trades||[])){if(deletedSet.has(t.id))continue;const ex=map.get(t.id);if(!ex||(t.updatedAt||0)>(ex.updatedAt||0))map.set(t.id,t)}
+  const avoidSet=new Set([...(local.avoidDays||[]),...(remote.avoidDays||[])]);
+  return{...local,trades:Array.from(map.values()),avoidDays:Array.from(avoidSet),deletedIds};
+}
 
 // ─── R Calculation Helpers ───
 function calcRRFromPrices(entry,sl,target,dir){
@@ -1624,7 +1640,7 @@ function svTr(){const f=window._f;if(!f||!f.result){alert("Select a result");ret
   else if(taggedAccts.length>0){const a=taggedAccts[0];const rPer=a.accountSize*(a.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}
   else{const ft=D.settings.ftmo;if(ft&&ft.enabled){const rPer=ft.accountSize*(ft.riskPct/100);f.dollarPL=Math.round(tradeR(f)*rPer*100)/100}else{f.dollarPL=null}}}
   if(editId){const i=D.trades.findIndex(t=>t.id===editId);if(i>=0)D.trades[i]={...f,id:editId,updatedAt:Date.now()}}else D.trades.push({...f,id:uid(),updatedAt:Date.now()});save();editId=null;window._f=null;tab="log";toast("Saved");R();if(D.settings.gdSync&&D.settings.gdCid)gPush()}
-function del(id){if(!confirm("Delete?"))return;D.trades=D.trades.filter(t=>t.id!==id);save();toast("Deleted","warn");R()}
+function del(id){if(!confirm("Delete?"))return;D.trades=D.trades.filter(t=>t.id!==id);if(!D.deletedIds)D.deletedIds=[];D.deletedIds.push({id,deletedAt:Date.now()});save();toast("Deleted","warn");R();if(D.settings.gdSync&&D.settings.gdCid)gPush(true)}
 function expJ(){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:"application/json"}));a.download=`OCC_${new Date().toISOString().slice(0,10)}.json`;a.click();toast("Exported")}
 function impJ(el){const f=el.files?.[0];if(!f)return;const rd=new FileReader();rd.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(d.trades){migrate(d);D=d;save();toast(`${d.trades.length} trades imported`);R()}}catch{toast("Invalid","error")}};rd.readAsText(f);el.value=""}
 function clr(){if(!confirm("Clear all data?"))return;const th=D.settings.theme;D={trades:[],avoidDays:[],settings:defSettings()};D.settings.theme=th;save();toast("Cleared","warn");R()}
