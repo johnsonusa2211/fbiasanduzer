@@ -364,6 +364,15 @@ function getSessionLabel(session,dateStr){
   }
   return t+(isUsDst(dt)?" (DST)":" (ST)");
 }
+function getDstDates(yr){
+  const fmt=(m,d)=>{const dt=new Date(yr,m-1,d);return dt.toLocaleDateString("en-US",{month:"short",day:"numeric"})};
+  return{
+    usDstStart:fmt(3,secondSundayMar(yr)),
+    usDstEnd:fmt(11,firstSundayNov(yr)),
+    ukBstStart:fmt(3,lastSunday(yr,3)),
+    ukBstEnd:fmt(10,lastSunday(yr,10))
+  };
+}
 const SK="occ-ello2",GDN="occ_journal_backup.json",IMG_FOLDER="OCC_Journal_Images";
 let D=load(),tab="home",editId=null,expId=null,fP="ALL",fR="ALL",lbS=null,tTm=null,gSt="idle",rSub="inv",imgUploading=false,uplPct=0,activeAcctIdx=0,ftmoSub="dashboard";
 // Image viewer state: {images:[], idx:0} or null
@@ -444,21 +453,44 @@ function ftmoStatsForAccount(s,acctId){
   const acct=s.accountSize,rPer=acct*(s.riskPct/100);
   const start=s.startDate;
   let tr=D.trades.filter(t=>!start||t.date>=start).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  // If acctId provided, filter to trades tagged for this account (or all if none tagged)
   if(acctId){tr=tr.filter(t=>!t.ftmoAccounts||t.ftmoAccounts.length===0||t.ftmoAccounts.includes(acctId))}
-  let cum=0,peak=acct,daily={};
-  tr.forEach(t=>{const _apl=parseFloat(t.actualPL);const pl=!isNaN(_apl)?_apl:(()=>{const r=tradeR(t),tRisk=t.riskDollar&&parseFloat(t.riskDollar)>0?parseFloat(t.riskDollar):rPer;return r*tRisk})();cum+=pl;const bal=acct+cum;if(bal>peak)peak=bal;
-    const dk=t.date||"";if(dk){if(!daily[dk])daily[dk]={pl:0,n:0,cum:0};daily[dk].pl+=pl;daily[dk].n++}});
-  let rc=0;Object.keys(daily).sort().forEach(k=>{rc+=daily[k].pl;daily[k].cum=rc});
-  const bal=acct+cum,tdd=peak>0?((peak-bal)/acct)*100:0;
+  // ─── Prop Firm DD Logic ───
+  // Daily DD: from start-of-day EQUITY (balance before today's trades), resets each day
+  // Total DD: from INITIAL balance — equity must never drop below (initial - max%)
+  let cum=0,minBal=acct,daily={};
+  tr.forEach(t=>{
+    const _apl=parseFloat(t.actualPL);
+    const pl=!isNaN(_apl)?_apl:(()=>{const r=tradeR(t),tRisk=t.riskDollar&&parseFloat(t.riskDollar)>0?parseFloat(t.riskDollar):rPer;return r*tRisk})();
+    cum+=pl;
+    const bal=acct+cum;
+    if(bal<minBal)minBal=bal;
+    const dk=t.date||"";
+    if(dk){if(!daily[dk])daily[dk]={pl:0,n:0,cum:0,startBal:0};daily[dk].pl+=pl;daily[dk].n++}
+  });
+  // Calculate start-of-day balance for each day and daily DD from it
+  let runCum=0,worstDailyDDPct=0;
+  Object.keys(daily).sort().forEach(k=>{
+    daily[k].startBal=acct+runCum; // balance at start of this day
+    daily[k].cum=runCum+daily[k].pl;
+    // Daily DD = loss from start-of-day balance, as % of INITIAL account
+    const dayLoss=daily[k].pl<0?Math.abs(daily[k].pl):0;
+    daily[k].ddPct=(dayLoss/acct)*100;
+    if(daily[k].ddPct>worstDailyDDPct)worstDailyDDPct=daily[k].ddPct;
+    runCum+=daily[k].pl;
+  });
+  const bal=acct+cum;
+  // Total DD: max drop from INITIAL account (not from peak) — FTMO rule
+  const tdd=minBal<acct?((acct-minBal)/acct)*100:0;
+  // Today's daily DD from start-of-day balance
   const today=new Date().toISOString().slice(0,10),todayPL=daily[today]?.pl||0;
+  const todayStartBal=daily[today]?.startBal||bal;
   const ddu=todayPL<0?Math.abs(todayPL/acct)*100:0;
   const daysPassed=start?Math.floor((Date.now()-new Date(start+"T00:00:00").getTime())/864e5):0;
   const daysLeft=s.daysAllowed>0?Math.max(0,s.daysAllowed-daysPassed):999;
   const tgt=acct*(s.profitTarget/100),prog=tgt>0&&cum>0?(cum/tgt)*100:0;
   const split=s.profitSplit||80;
   const traderIncome=cum>0?cum*(split/100):0;
-  return{acct,rPer,cum,bal,tgt,profPct:(cum/acct)*100,prog:Math.min(prog,100),tdd,tddLeft:s.maxTotalDD-tdd,ddu,dduLeft:s.maxDailyDD-ddu,todayPL,daysPassed,daysLeft,daily,phase:s.phase,cnt:tr.length,split,traderIncome,name:s.name||"Account"}
+  return{acct,rPer,cum,bal,tgt,profPct:(cum/acct)*100,prog:Math.min(prog,100),tdd,tddLeft:s.maxTotalDD-tdd,ddu,dduLeft:s.maxDailyDD-ddu,todayPL,todayStartBal,worstDailyDDPct,daysPassed,daysLeft,daily,phase:s.phase,cnt:tr.length,split,traderIncome,name:s.name||"Account"}
 }
 function allAccountStats(){
   const accounts=D.settings.ftmoAccounts.filter(a=>a.enabled);
@@ -668,8 +700,89 @@ document.addEventListener('keydown',e=>{if(!ivState)return;
   else if(e.key==='ArrowLeft'){ivState.idx=(ivState.idx-1+ivState.images.length)%ivState.images.length;R()}
   else if(e.key==='ArrowRight'){ivState.idx=(ivState.idx+1)%ivState.images.length;R()}});
 
+// ═══ TRADING HOURS ═══
+function tradingHoursCard(){
+  const now=new Date();
+  const bst=isUkBst(now),dst=isUsDst(now);
+  const h7=now.getUTCHours()+7,m7=now.getUTCMinutes(); // approx UTC+7
+  const curMin=(h7%24)*60+m7;
+  // Session times
+  const ldnEur={h:14,m:30,label:"14:30"},ldnOther=bst?{h:14,m:30,label:"14:30 (BST)"}:{h:15,m:30,label:"15:30 (GMT)"};
+  const ny=dst?{h:20,m:30,label:"20:30 (DST)"}:{h:21,m:30,label:"21:30 (ST)"};
+  const ldnCut={h:23,m:0,label:"23:00"},nyCut={h:24,m:0,label:"00:00"};
+  // Session status
+  const ldnEurStart=ldnEur.h*60+ldnEur.m,ldnOtherStart=ldnOther.h*60+ldnOther.m,nyStart=ny.h*60+ny.m;
+  const ldnEnd=ldnCut.h*60,nyEnd=nyCut.h*60;
+  function sesStatus(start,end){
+    if(curMin>=start&&curMin<end)return"LIVE";
+    if(curMin<start)return"upcoming";
+    return"closed";
+  }
+  const ldnSt=sesStatus(Math.min(ldnEurStart,ldnOtherStart),ldnEnd);
+  const nySt=sesStatus(nyStart,nyEnd);
+  // DST status labels
+  const ukLabel=bst?"UK: BST (summer)":"UK: GMT (winter)";
+  const usLabel=dst?"US: EDT (summer)":"US: EST (winter)";
+  // Next DST change
+  const yr=now.getFullYear(),mo=now.getMonth()+1;
+  let nextDstEvent="";
+  if(bst){nextDstEvent=`UK → GMT: last Sun Oct ${yr}`}
+  else if(mo<=3){nextDstEvent=`UK → BST: last Sun Mar ${yr}`}
+  else{nextDstEvent=`UK → BST: last Sun Mar ${yr+1}`}
+  if(dst){nextDstEvent+=` · US → EST: 1st Sun Nov ${yr}`}
+  else if(mo<=3){nextDstEvent+=` · US → EDT: 2nd Sun Mar ${yr}`}
+  else{nextDstEvent+=` · US → EDT: 2nd Sun Mar ${yr+1}`}
+
+  const dot=(st)=>st==="LIVE"?`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--text);margin-right:4px;animation:ftmoPulse 1.2s infinite"></span>`:`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;border:1px solid var(--dim);margin-right:4px"></span>`;
+  const stBadge=(st)=>st==="LIVE"?`<span style="font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--text)">LIVE</span>`:st==="upcoming"?`<span style="font-size:9px;font-weight:600;letter-spacing:1px;color:var(--muted)">UPCOMING</span>`:`<span style="font-size:9px;font-weight:600;letter-spacing:1px;color:var(--dim)">CLOSED</span>`;
+
+  let h=`<div style="border:1px solid var(--line);padding:16px;margin-bottom:24px">`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:9px;font-weight:600;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted)">Trading Hours</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--dim)">${ukLabel} · ${usLabel}</span></div>`;
+
+  // London section
+  h+=`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px">LONDON</span>${dot(ldnSt)}${stBadge(ldnSt)}</div>`;
+  h+=`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12px;font-family:'JetBrains Mono',monospace">`;
+  h+=`<span style="color:var(--muted)">EURUSD</span><span style="font-weight:600">${ldnEur.label} → ${ldnCut.label} UTC+7</span>`;
+  h+=`<span style="color:var(--muted)">GBPUSD+</span><span style="font-weight:600">${ldnOther.label} → ${ldnCut.label} UTC+7</span>`;
+  h+=`<span style="color:var(--muted)">Crypto</span><span style="font-weight:600">${ldnOther.label} → ${ldnCut.label} UTC+7</span>`;
+  h+=`</div></div>`;
+
+  // NY section
+  h+=`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px">NEW YORK</span>${dot(nySt)}${stBadge(nySt)}</div>`;
+  h+=`<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12px;font-family:'JetBrains Mono',monospace">`;
+  h+=`<span style="color:var(--muted)">All pairs</span><span style="font-weight:600">${ny.label} → ${nyCut.label} UTC+7</span>`;
+  h+=`<span style="color:var(--muted)">USATECH</span><span style="font-weight:600">${ny.label} → ${nyCut.label} (NY only)</span>`;
+  h+=`</div></div>`;
+
+  // B5 thresholds quick ref
+  h+=`<div style="border-top:1px solid var(--line3);padding-top:8px;margin-top:4px"><div style="font-size:9px;color:var(--dim);letter-spacing:1px;font-weight:600;margin-bottom:4px">B5 THRESHOLDS (AUTO)</div>`;
+  h+=`<div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap">`;
+  h+=`<span>LDN Forex: <strong style="color:var(--text)">40%</strong></span>`;
+  h+=`<span>NY Forex: <strong style="color:var(--text)">5%</strong></span>`;
+  h+=`<span>NY USATECH: <strong style="color:var(--text)">12%</strong></span>`;
+  h+=`<span>Crypto: <strong style="color:var(--text)">40/5%</strong></span>`;
+  h+=`</div></div>`;
+
+  // DST calendar with exact dates
+  const dstDates=getDstDates(yr);
+  h+=`<div style="border-top:1px solid var(--line3);padding-top:8px;margin-top:6px">`;
+  h+=`<div style="font-size:9px;color:var(--dim);letter-spacing:1px;font-weight:600;margin-bottom:6px">DST CALENDAR ${yr}</div>`;
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:11px">`;
+  h+=`<div style="color:var(--muted)">US DST → EDT</div><div style="font-family:'JetBrains Mono',monospace;color:var(--text)">${dstDates.usDstStart} <span style="color:var(--dim)">NY→20:30</span></div>`;
+  h+=`<div style="color:var(--muted)">UK BST start</div><div style="font-family:'JetBrains Mono',monospace;color:var(--text)">${dstDates.ukBstStart} <span style="color:var(--dim)">LDN→14:30</span></div>`;
+  h+=`<div style="color:var(--muted)">UK BST end</div><div style="font-family:'JetBrains Mono',monospace;color:var(--text)">${dstDates.ukBstEnd} <span style="color:var(--dim)">LDN→15:30</span></div>`;
+  h+=`<div style="color:var(--muted)">US DST → EST</div><div style="font-family:'JetBrains Mono',monospace;color:var(--text)">${dstDates.usDstEnd} <span style="color:var(--dim)">NY→21:30</span></div>`;
+  h+=`</div>`;
+  // Gap period warning: US is DST but UK still GMT
+  if(dst&&!bst){h+=`<div style="margin-top:6px;padding:6px 10px;border:1px solid var(--dim);font-size:10px;color:var(--muted)">GAP PERIOD NOW: US is DST but UK still GMT — London GBPUSD at 15:30, NY at 20:30</div>`}
+  h+=`</div>`;
+
+  h+=`</div>`;
+  return h;
+}
+
 // ═══ HOME ═══
-function pgHome(){const s=stats(),fs=ftmoStats();let h=`<div class="hl">Overview</div><p class="bt" style="margin-bottom:24px">One Candle Confirmation · v6 · London & NY (DST-Aware)</p>`;
+function pgHome(){const s=stats(),fs=ftmoStats();let h=`<div class="hl">Overview</div><p class="bt" style="margin-bottom:24px">OCC Phantom Edge v8.1.1 · DST-Adaptive · B5 Momentum</p>`;
   // FTMO banner(s)
   const ftmoAcctsActive=D.settings.ftmoAccounts.filter(a=>a.enabled);
   if(ftmoAcctsActive.length>0){
@@ -682,6 +795,9 @@ function pgHome(){const s=stats(),fs=ftmoStats();let h=`<div class="hl">Overview
       h+=`</div>`;
     });
   } else if(fs){h+=`<div class="ftmo-banner" onclick="go('ftmo')"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600;font-size:12px;letter-spacing:1px">${fs.phase.toUpperCase()}</span><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700">${fs.profPct>=0?"+":""}${fs.profPct.toFixed(2)}%</span></div><div class="ftmo-bar" style="margin-top:8px"><div class="ftmo-fill" style="width:${Math.min(fs.prog,100)}%"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px"><span>${fs.prog.toFixed(0)}% of target</span><span>DD: ${fs.tdd.toFixed(1)}%</span></div></div>`}
+
+  // ─── Trading Hours Card (auto DST) ───
+  h+=tradingHoursCard();
 
   h+=`<div class="sg"><div class="sc"><div class="sn">${s.total}</div><div class="sl">Trades</div></div><div class="sc"><div class="sn">${s.wr.toFixed(0)}%</div><div class="sl">Win Rate</div></div><div class="sc"><div class="sn" style="display:flex;gap:12px;justify-content:center"><span>${s.wins}</span><span style="color:var(--dim)">${s.losses}</span><span style="color:var(--dim);font-size:20px">${s.be}</span></div><div class="sl">W · L · BE</div></div><div class="sc"><div class="sn">${s.rr>=0?"+":""}${s.rr.toFixed(1)}</div><div class="sl">Net R:R</div></div></div>`;
   h+=`<hr class="sr"><div class="slbl">By Pair</div><div class="pl">${PAIRS.map(p=>{const d=s.bp[p];return`<div class="pi"><div style="display:flex;align-items:center;gap:14px">${ringBW(d.r)}<div><div class="pn">${p}</div><div class="ps">${d.w}W / ${d.t-d.w}L · ${d.t}</div></div></div><div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600">${d.r.toFixed(0)}%</div></div>`}).join("")}</div>`;
@@ -696,7 +812,7 @@ function pgLog(){let h=`<div class="hl">Trades</div><div style="display:flex;gap
   h+=`<div style="border-top:1px solid var(--line)">`;
   tr.forEach(t=>{
     const tR=tradeR(t),rDisp=t.usePartial&&t.combinedR!==""?`${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R`:tR!==0?`${tR>=0?"+":""}${tR.toFixed(2)}R`:"";
-    h+=`<div class="ti" onclick="expId=expId==='${t.id}'?null:'${t.id}';R()"><div class="tt"><div class="tl"><div class="rd ${t.result}"></div><span class="tp">${t.pair}</span>${t.usePartial?`<span class="pbadge">P</span>`:""}${(t.ftmoAccounts||[]).length>0?`<span class="pbadge">${t.ftmoAccounts.length}A</span>`:""}<span style="font-size:11px;color:var(--muted);font-weight:500">${t.direction}</span>${t.session?`<span style="font-size:9px;color:var(--dim);font-weight:600;letter-spacing:1px;text-transform:uppercase">${t.session==="london"?"LDN":t.session==="newyork"?"NY-DST":"NY-STD"}</span>`:""}</div><div class="tm">${t.date?fmt(t.date):""} ${rDisp?`· ${rDisp}`:""}</div></div>`;
+    h+=`<div class="ti" onclick="expId=expId==='${t.id}'?null:'${t.id}';R()"><div class="tt"><div class="tl"><div class="rd ${t.result}"></div><span class="tp">${t.pair}</span>${t.usePartial?`<span class="pbadge">P</span>`:""}${(t.ftmoAccounts||[]).length>0?`<span class="pbadge">${t.ftmoAccounts.length}A</span>`:""}<span style="font-size:11px;color:var(--muted);font-weight:500">${t.direction}</span>${t.session?`<span style="font-size:9px;color:var(--dim);font-weight:600;letter-spacing:1px;text-transform:uppercase">${t.session==="london"?"LDN "+getSessionTime("london",t.date):"NY "+getSessionTime("newyork",t.date)}</span>`:""}</div><div class="tm">${t.date?fmt(t.date):""} ${rDisp?`· ${rDisp}`:""}</div></div>`;
     if(expId===t.id){h+=`<div class="te"><div class="teg">${t.entry?`<div><div class="tel">Entry</div><div class="tev">${esc(t.entry)}</div></div>`:""}${t.sl?`<div><div class="tel">SL</div><div class="tev">${esc(t.sl)}</div></div>`:""}${t.tp?`<div><div class="tel">TP</div><div class="tev">${esc(t.tp)}</div></div>`:""}${t.exitPrice?`<div><div class="tel">Exit</div><div class="tev">${esc(t.exitPrice)}</div></div>`:""}${t.occH?`<div><div class="tel">Zone H</div><div class="tev">${esc(t.occH)}</div></div>`:""}${t.occL?`<div><div class="tel">Zone L</div><div class="tev">${esc(t.occL)}</div></div>`:""}${t.riskDollar?`<div><div class="tel">Risk $</div><div class="tev">$${esc(t.riskDollar)}</div></div>`:""}${t.actualPL?`<div><div class="tel">MT5 P&L</div><div class="tev" style="font-weight:700;color:${parseFloat(t.actualPL)>=0?"var(--accent)":"var(--text)"}">${parseFloat(t.actualPL)>=0?"+":""}$${parseFloat(t.actualPL).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div></div>`:""}</div>`;
       // Partial TP details
       if(t.usePartial){h+=`<div class="teg" style="margin-top:8px">${t.tp1?`<div><div class="tel">TP1</div><div class="tev">${esc(t.tp1)}</div></div>`:""}<div><div class="tel">Leg 1 (${t.partialPct||50}%)</div><div class="tev">${t.leg1Result||"—"}${t.leg1Exit?" @ "+esc(t.leg1Exit):""}</div></div><div><div class="tel">Leg 2 (${100-parseInt(t.partialPct||50)}%)</div><div class="tev">${t.leg2Result||"—"}${t.leg2Exit?" @ "+esc(t.leg2Exit):""}</div></div>${t.combinedR!==""&&t.combinedR!==null?`<div><div class="tel">Combined R</div><div class="tev" style="font-weight:700">${parseFloat(t.combinedR)>=0?"+":""}${parseFloat(t.combinedR).toFixed(2)}R</div></div>`:""}</div>`}
@@ -813,11 +929,18 @@ function renderAcctCard(fs,a){
   h+=`<div class="sg"><div class="sc"><div class="sn">$${fs.bal.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="sl">Balance</div></div><div class="sc"><div class="sn">${fs.cum>=0?"+":""}$${fs.cum.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div class="sl">P&L</div></div><div class="sc"><div class="sn">${fs.cnt}</div><div class="sl">Trades</div></div><div class="sc"><div class="sn">${fs.profPct>=0?"+":""}${fs.profPct.toFixed(2)}%</div><div class="sl">Return</div></div></div>`;
   // Target progress
   if(fs.tgt>0){h+=`<div style="margin-top:16px"><div class="ftmo-bar"><div class="ftmo-fill" style="width:${Math.min(fs.prog,100)}%"></div></div><div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-top:4px"><span>${fs.prog.toFixed(1)}%</span><span>$${fs.cum.toLocaleString(undefined,{maximumFractionDigits:0})} / $${fs.tgt.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div></div>`;if(fs.prog>=100)h+=`<div style="margin-top:8px;padding:8px 16px;border:1px solid var(--text);text-align:center;font-size:12px;font-weight:600">TARGET REACHED</div>`}
-  // DD
+  // DD — Prop Firm Logic
+  // Daily DD: from start-of-day balance, resets each day (FTMO rule)
+  // Total DD: from initial balance (equity must not drop below initial - max%)
   const maxDD=a.maxDailyDD||5,maxTDD=a.maxTotalDD||10;
   const dduPct=Math.min((fs.ddu/maxDD)*100,100),tddPct=Math.min((fs.tdd/maxTDD)*100,100);
-  h+=`<div style="margin-top:16px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Daily DD: ${fs.ddu.toFixed(2)}% / ${maxDD}%</div><div class="ftmo-bar"><div class="ftmo-fill ${dduPct>80?"ftmo-danger":""}" style="width:${dduPct}%"></div></div></div>`;
-  h+=`<div style="margin-top:8px"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">Total DD: ${fs.tdd.toFixed(2)}% / ${maxTDD}%</div><div class="ftmo-bar"><div class="ftmo-fill ${tddPct>80?"ftmo-danger":""}" style="width:${tddPct}%"></div></div></div>`;
+  const dduDollar=fs.ddu>0?(fs.acct*(fs.ddu/100)):0;
+  const tddDollar=fs.tdd>0?(fs.acct*(fs.tdd/100)):0;
+  const dduLimit=fs.acct*(maxDD/100),tddLimit=fs.acct*(maxTDD/100);
+  const floorBal=fs.acct-tddLimit;
+  h+=`<div style="margin-top:16px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px"><span>Daily DD: ${fs.ddu.toFixed(2)}% / ${maxDD}%</span><span>-$${dduDollar.toLocaleString(undefined,{maximumFractionDigits:0})} / $${dduLimit.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div class="ftmo-bar"><div class="ftmo-fill ${dduPct>80?"ftmo-danger":""}" style="width:${dduPct}%"></div></div><div style="font-size:9px;color:var(--dim);margin-top:2px">Resets daily · From start-of-day balance${fs.todayStartBal!==fs.acct?" ($"+fs.todayStartBal.toLocaleString(undefined,{maximumFractionDigits:0})+")":""}</div></div>`;
+  h+=`<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px"><span>Max DD: ${fs.tdd.toFixed(2)}% / ${maxTDD}%</span><span>-$${tddDollar.toLocaleString(undefined,{maximumFractionDigits:0})} / $${tddLimit.toLocaleString(undefined,{maximumFractionDigits:0})}</span></div><div class="ftmo-bar"><div class="ftmo-fill ${tddPct>80?"ftmo-danger":""}" style="width:${tddPct}%"></div></div><div style="font-size:9px;color:var(--dim);margin-top:2px">From initial $${fs.acct.toLocaleString()} · Floor: $${floorBal.toLocaleString(undefined,{maximumFractionDigits:0})}</div></div>`;
+  if(fs.worstDailyDDPct>0)h+=`<div style="margin-top:6px;font-size:9px;color:var(--dim)">Worst single-day DD: ${fs.worstDailyDDPct.toFixed(2)}%</div>`;
   if(dduPct>80||tddPct>80)h+=`<div style="margin-top:8px;padding:8px;border:1px solid var(--text);text-align:center;font-size:11px;font-weight:600">NEAR DD LIMIT</div>`;
   // Timeline
   if(fs.daysPassed>0||fs.daysLeft<999){h+=`<div style="display:flex;justify-content:space-between;margin-top:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted)"><span>${fs.daysPassed}d in</span><span>${fs.daysLeft<999?fs.daysLeft+"d left":"ongoing"}</span></div>`}
