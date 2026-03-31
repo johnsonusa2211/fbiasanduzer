@@ -683,6 +683,7 @@ function R(){
   if(tab==="home")h+=pgHome();else if(tab==="log")h+=pgLog();else if(tab==="new")h+=pgForm();
   else if(tab==="rules")h+=pgRules();else if(tab==="corr")h+=pgCorr();else if(tab==="ftmo")h+=pgFtmo();else if(tab==="setup")h+=pgSetup();
   document.getElementById("app").innerHTML=h;
+  if(document.getElementById('rmPath')){_rmSetup();if(window._rmEditMode)_rmEditSetup();}
 
   // Attach swipe to image viewer
   if(ivState){const body=document.querySelector('.iv-body');if(body){let sx=0,sy=0,sw=false;
@@ -1221,6 +1222,225 @@ function savePayout(){
   save();toast(`+$${amount.toLocaleString()} logged`);R();
 }
 
+// ═══ ROADMAP INTERACTIVITY ═══
+const _rmPalette=[
+  {r:'#34d399',g:'rgba(52,211,153,0.35)'},   // 0  START           emerald
+  {r:'#fbbf24',g:'rgba(251,191,36,0.4)'},    // 1  CHALLENGE #1    amber
+  {r:'#818cf8',g:'rgba(129,140,248,0.35)'},  // 2  VERIFICATION #1 indigo
+  {r:'#22d3ee',g:'rgba(34,211,238,0.35)'},   // 3  FUNDED #1       cyan
+  {r:'#fb923c',g:'rgba(251,146,60,0.35)'},   // 4  CHALLENGE #2    orange
+  {r:'#fde047',g:'rgba(253,224,71,0.4)'},    // 5  FUNDED #2       yellow
+  {r:'#f87171',g:'rgba(248,113,113,0.35)'},  // 6  CHALLENGE #3    red
+  {r:'#a78bfa',g:'rgba(167,139,250,0.35)'},  // 7  FUNDED #3       violet
+  {r:'#ff7043',g:'rgba(255,112,67,0.4)'},    // 8  $50K WITHDRAWN  deep-orange
+  {r:'#fcd34d',g:'rgba(252,211,77,0.45)'},   // 9  $100K GOAL      gold
+  {r:'#94a3b8',g:'rgba(148,163,184,0.3)'},   // 10 MASTER TRADER   silver
+  {r:'#f1f5f9',g:'rgba(241,245,249,0.4)'},   // 11 FREEDOM         white
+];
+function _rmSetup(){
+  const path=document.getElementById('rmPath');
+  const g=document.getElementById('rmMarkers');
+  if(!path||!g)return;
+  const ms=window._rmMs;
+  const step=window._rmStep||0;
+  if(!ms)return;
+  const L=path.getTotalLength();
+  if(L<1)return;
+  g.innerHTML='';
+  const NS='http://www.w3.org/2000/svg';
+  const mk=(tag,a)=>{const el=document.createElementNS(NS,tag);Object.entries(a||{}).forEach(([k,v])=>el.setAttribute(k,v));return el;};
+  const tx=(tag,a,t)=>{const el=mk(tag,a);el.textContent=t;return el;};
+  // Inject per-milestone radial gradients into SVG defs
+  const svg=path.ownerSVGElement;
+  let defs=svg.querySelector('defs');
+  if(!defs){defs=mk('defs',{});svg.insertBefore(defs,svg.firstChild);}
+  [...defs.querySelectorAll('[id^="rmRG"]')].forEach(el=>el.remove());
+  _rmPalette.forEach((p,i)=>{
+    const rg=mk('radialGradient',{id:`rmRG${i}`,cx:'35%',cy:'28%',r:'72%'});
+    rg.appendChild(mk('stop',{'offset':'0%','stop-color':p.r,'stop-opacity':'0.88'}));
+    rg.appendChild(mk('stop',{'offset':'100%','stop-color':p.r,'stop-opacity':'0.08'}));
+    defs.appendChild(rg);
+  });
+  ms.forEach((m,i)=>{
+    const isDone=i<step,isCur=i===step&&step<ms.length,isFut=i>step;
+    const pt=path.getPointAtLength(m.progress*L);
+    const x=pt.x,y=pt.y;
+    const p=_rmPalette[i]||_rmPalette[_rmPalette.length-1];
+    const rc=isCur?5.5:isDone?5:4.5;
+    const op=isFut?0.3:1;
+    const grp=mk('g',{opacity:op});
+    grp.style.cursor='pointer';
+    // Outer pulse ring for current milestone
+    if(isCur){
+      const pulse=mk('circle',{cx:x,cy:y,r:rc+5,fill:'none',stroke:p.r,'stroke-width':'0.4','stroke-opacity':'0.5'});
+      pulse.style.animation='rmHalo 2.2s ease-in-out infinite';
+      grp.appendChild(pulse);
+      const pulse2=mk('circle',{cx:x,cy:y,r:rc+8.5,fill:'none',stroke:p.r,'stroke-width':'0.2','stroke-opacity':'0.22'});
+      pulse2.style.animation='rmHalo 2.2s ease-in-out infinite 0.5s';
+      grp.appendChild(pulse2);
+    }
+    // Soft glow behind circle
+    if(!isFut){
+      grp.appendChild(mk('circle',{cx:x,cy:y,r:rc+3.5,fill:p.g,'filter':'url(#rmBlur)'}));
+    }
+    // Outer metallic ring
+    grp.appendChild(mk('circle',{cx:x,cy:y,r:rc+0.7,fill:'none',stroke:isDone?'#4ade80':p.r,'stroke-width':isCur?'0.6':isDone?'0.5':'0.35'}));
+    // Body with radial gradient
+    grp.appendChild(mk('circle',{cx:x,cy:y,r:rc,fill:isDone?'rgba(74,222,128,0.22)':isFut?'rgba(255,255,255,0.04)':`url(#rmRG${i})`}));
+    // Glass rim
+    grp.appendChild(mk('circle',{cx:x,cy:y,r:rc,fill:'none',stroke:'rgba(255,255,255,0.22)','stroke-width':'0.15'}));
+    // Shimmer arc (top highlight)
+    if(!isFut){
+      grp.appendChild(mk('path',{d:`M ${x-rc*0.6},${y-rc*0.7} A ${rc},${rc} 0 0,1 ${x+rc*0.6},${y-rc*0.7}`,fill:'none',stroke:'rgba(255,255,255,0.5)','stroke-width':'0.25'}));
+    }
+    // Emoji icon
+    const ie=tx('text',{x,y:y+rc*0.35,'text-anchor':'middle','font-size':rc*0.9,'dominant-baseline':'middle',opacity:isFut?0.35:1},m.icon);
+    ie.style.pointerEvents='none';
+    grp.appendChild(ie);
+    // Completed green check badge
+    if(isDone){
+      grp.appendChild(mk('circle',{cx:x+rc*0.82,cy:y-rc*0.82,r:rc*0.38,fill:'#22c55e',stroke:'#0f172a','stroke-width':'0.2'}));
+      grp.appendChild(tx('text',{x:x+rc*0.82,y:y-rc*0.82,'text-anchor':'middle','font-size':rc*0.36,fill:'white','dominant-baseline':'middle','font-weight':'700'},'✓'));
+    }
+    // Step number badge (upcoming)
+    if(isFut){
+      grp.appendChild(mk('circle',{cx:x+rc*0.82,cy:y-rc*0.82,r:rc*0.35,fill:'rgba(255,255,255,0.08)',stroke:'rgba(255,255,255,0.15)','stroke-width':'0.15'}));
+      grp.appendChild(tx('text',{x:x+rc*0.82,y:y-rc*0.82,'text-anchor':'middle','font-size':rc*0.3,fill:'rgba(255,255,255,0.4)','dominant-baseline':'middle'},String(i+1)));
+    }
+    // Label — smart side based on x position
+    const isLeft=x<50;
+    const lx=isLeft?x+rc+5:x-rc-5;
+    const anc=isLeft?'start':'end';
+    const lblCol=isFut?'rgba(255,255,255,0.22)':(isDone?'#4ade80':p.r);
+    grp.appendChild(tx('text',{x:lx,y:y-1,'text-anchor':anc,'font-size':'3.8',fill:'white',opacity:isFut?0.22:0.95,'font-weight':'700'},m.label));
+    grp.appendChild(tx('text',{x:lx,y:y+3.2,'text-anchor':anc,'font-size':'2.8',fill:p.r,opacity:isFut?0.14:0.78},m.sub));
+    // YOU ARE HERE indicator
+    if(isCur){
+      const yah=tx('text',{x,y:y+rc+5.5,'text-anchor':'middle','font-size':'2.2',fill:p.r,opacity:'0.95','font-weight':'700','letter-spacing':'0.5'},'▼ YOU ARE HERE');
+      yah.style.animation='rmHalo 2.2s ease-in-out infinite';
+      grp.appendChild(yah);
+    }
+    // Invisible hit area
+    const hit=mk('circle',{cx:x,cy:y,r:rc+7,fill:'transparent'});
+    hit.addEventListener('click',()=>rmModal(i));
+    grp.appendChild(hit);
+    g.appendChild(grp);
+  });
+}
+function rmModal(i){
+  const ms=window._rmMs,step=window._rmStep||0;
+  if(!ms||!ms[i])return;
+  const m=ms[i];
+  const isDone=i<step,isCur=i===step&&step<ms.length;
+  const p=_rmPalette[i]||_rmPalette[_rmPalette.length-1];
+  const sc=isDone?'#22c55e':isCur?p.r:'var(--muted)';
+  const sl=isDone?'COMPLETED':isCur?'CURRENT':'UPCOMING';
+  let c=`<div style="text-align:center;margin-bottom:20px">`;
+  c+=`<div style="font-size:52px;margin-bottom:10px">${m.icon}</div>`;
+  c+=`<div style="font-size:19px;font-weight:700;letter-spacing:1.5px;margin-bottom:4px;color:${isDone?'#22c55e':p.r}">${m.label}</div>`;
+  c+=`<div style="font-size:11px;color:var(--muted);margin-bottom:16px;letter-spacing:1.5px;text-transform:uppercase">${m.sub}</div>`;
+  c+=`<span style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:2.5px;padding:5px 18px;background:${sc}1a;border:1px solid ${sc};color:${sc}">${sl}</span>`;
+  c+=`</div>`;
+  c+=`<div style="height:1px;background:linear-gradient(to right,transparent,${p.r}50,transparent);margin:4px 0 18px"></div>`;
+  c+=`<div style="font-size:13px;line-height:1.8;color:var(--sub);margin-bottom:16px">${m.desc}</div>`;
+  c+=`<div style="padding:14px 16px;border-left:3px solid ${p.r};background:var(--faint);font-size:12px;font-style:italic;color:var(--muted);line-height:1.7">"${m.q}"</div>`;
+  c+=`<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line3);font-size:11px;color:var(--sub);line-height:1.8">${m.qw}</div>`;
+  document.getElementById('rmModalContent').innerHTML=c;
+  document.getElementById('rmModal').style.display='flex';
+}
+function rmClose(){const el=document.getElementById('rmModal');if(el)el.style.display='none';}
+
+// ─── PATH EDITOR HELPERS ───
+function _rmParsePath(d){
+  const t=d.trim().split(/\s+/);const nodes=[];let i=0;
+  while(i<t.length){const cmd=t[i++];
+    if(cmd==='M')nodes.push({type:'M',x:+t[i++],y:+t[i++]});
+    else if(cmd==='C')nodes.push({type:'C',cp1x:+t[i++],cp1y:+t[i++],cp2x:+t[i++],cp2y:+t[i++],x:+t[i++],y:+t[i++]});
+  }return nodes;
+}
+function _rmSerializePath(nodes){
+  return nodes.map(n=>n.type==='M'?`M ${n.x.toFixed(2)} ${n.y.toFixed(2)}`:`C ${n.cp1x.toFixed(2)} ${n.cp1y.toFixed(2)} ${n.cp2x.toFixed(2)} ${n.cp2y.toFixed(2)} ${n.x.toFixed(2)} ${n.y.toFixed(2)}`).join(' ');
+}
+function _rmTransformPath(nodes,dx,dy,sx,sy){
+  const cx=50,cy=82.5;
+  return nodes.map(n=>{
+    if(n.type==='M')return{...n,x:cx+(n.x-cx)*sx+dx,y:cy+(n.y-cy)*sy+dy};
+    return{...n,cp1x:cx+(n.cp1x-cx)*sx+dx,cp1y:cy+(n.cp1y-cy)*sy+dy,
+      cp2x:cx+(n.cp2x-cx)*sx+dx,cp2y:cy+(n.cp2y-cy)*sy+dy,
+      x:cx+(n.x-cx)*sx+dx,y:cy+(n.y-cy)*sy+dy};
+  });
+}
+function _rmSyncPaths(pd){
+  document.querySelectorAll('.rm-svg path').forEach(p=>{if(p)p.setAttribute('d',pd);});
+  const out=document.getElementById('rmPathOut');if(out)out.value=pd;
+}
+function _rmEditSetup(){
+  const svg=document.querySelector('.rm-svg');if(!svg)return;
+  let eg=document.getElementById('rmEditG');if(eg)eg.remove();
+  const NS='http://www.w3.org/2000/svg';
+  const mk=(tag,a)=>{const el=document.createElementNS(NS,tag);Object.entries(a||{}).forEach(([k,v])=>el.setAttribute(k,v));return el;};
+  eg=mk('g',{id:'rmEditG'});svg.appendChild(eg);
+  const nodes=window._rmEditNodes;
+  let prev=null;
+  nodes.forEach((n,i)=>{
+    if(n.type==='M'){
+      eg.appendChild(mk('circle',{cx:n.x,cy:n.y,r:'2',fill:'#fbbf24',stroke:'white','stroke-width':'0.5','data-idx':i,'data-field':'xy','class':'rme-h rme-a'}));
+      prev={x:n.x,y:n.y};
+    }else{
+      if(prev)eg.appendChild(mk('line',{x1:prev.x,y1:prev.y,x2:n.cp1x,y2:n.cp1y,stroke:'rgba(255,200,50,0.5)','stroke-width':'0.5','stroke-dasharray':'1.5 1',id:`rl-${i}-1`}));
+      eg.appendChild(mk('line',{x1:n.x,y1:n.y,x2:n.cp2x,y2:n.cp2y,stroke:'rgba(255,200,50,0.5)','stroke-width':'0.5','stroke-dasharray':'1.5 1',id:`rl-${i}-2`}));
+      eg.appendChild(mk('circle',{cx:n.cp1x,cy:n.cp1y,r:'1.4',fill:'#a78bfa',stroke:'rgba(255,255,255,0.7)','stroke-width':'0.35','data-idx':i,'data-field':'cp1','class':'rme-h rme-cp'}));
+      eg.appendChild(mk('circle',{cx:n.cp2x,cy:n.cp2y,r:'1.4',fill:'#a78bfa',stroke:'rgba(255,255,255,0.7)','stroke-width':'0.35','data-idx':i,'data-field':'cp2','class':'rme-h rme-cp'}));
+      eg.appendChild(mk('circle',{cx:n.x,cy:n.y,r:'2',fill:'#fbbf24',stroke:'white','stroke-width':'0.5','data-idx':i,'data-field':'xy','class':'rme-h rme-a'}));
+      prev={x:n.x,y:n.y};
+    }
+  });
+  let drag=null;
+  function svgPt(evt){const e=evt.touches?evt.touches[0]:evt;const pt=new DOMPoint(e.clientX,e.clientY);return pt.matrixTransform(svg.getScreenCTM().inverse());}
+  function onDown(evt){const t=evt.target;if(!t.classList||!t.classList.contains('rme-h'))return;evt.preventDefault();evt.stopPropagation();drag={idx:+t.dataset.idx,field:t.dataset.field,el:t};}
+  function onMove(evt){
+    if(!drag)return;evt.preventDefault();
+    const pt=svgPt(evt);const n=window._rmEditNodes[drag.idx];
+    if(drag.field==='xy'){n.x=pt.x;n.y=pt.y;drag.el.setAttribute('cx',pt.x);drag.el.setAttribute('cy',pt.y);}
+    else if(drag.field==='cp1'){n.cp1x=pt.x;n.cp1y=pt.y;drag.el.setAttribute('cx',pt.x);drag.el.setAttribute('cy',pt.y);}
+    else if(drag.field==='cp2'){n.cp2x=pt.x;n.cp2y=pt.y;drag.el.setAttribute('cx',pt.x);drag.el.setAttribute('cy',pt.y);}
+    // Update connector lines
+    const i=drag.idx,nodes=window._rmEditNodes,nl=nodes[i],prev=nodes[i-1];
+    const l1=document.getElementById(`rl-${i}-1`);if(l1&&prev){l1.setAttribute('x1',prev.x);l1.setAttribute('y1',prev.y);l1.setAttribute('x2',nl.cp1x);l1.setAttribute('y2',nl.cp1y);}
+    const l2=document.getElementById(`rl-${i}-2`);if(l2){l2.setAttribute('x1',nl.x);l2.setAttribute('y1',nl.y);l2.setAttribute('x2',nl.cp2x);l2.setAttribute('y2',nl.cp2y);}
+    const next=nodes[i+1];if(next){const ln=document.getElementById(`rl-${i+1}-1`);if(ln){ln.setAttribute('x1',nl.x);ln.setAttribute('y1',nl.y);}}
+    _rmSyncPaths(_rmSerializePath(window._rmEditNodes));
+  }
+  function onUp(){drag=null;}
+  svg.addEventListener('mousedown',onDown);svg.addEventListener('mousemove',onMove);
+  svg.addEventListener('mouseup',onUp);svg.addEventListener('mouseleave',onUp);
+  svg.addEventListener('touchstart',onDown,{passive:false});svg.addEventListener('touchmove',onMove,{passive:false});svg.addEventListener('touchend',onUp);
+  // Populate textarea with current path
+  const out=document.getElementById('rmPathOut');
+  if(out)out.value=_rmSerializePath(window._rmEditNodes);
+}
+function rmToggleEdit(){
+  window._rmEditMode=!window._rmEditMode;
+  if(window._rmEditMode){const path=document.getElementById('rmPath');if(path)window._rmEditNodes=_rmParsePath(path.getAttribute('d'));}
+  R();
+}
+function rmApplyTransform(){
+  const dx=+(document.getElementById('rme-dx').value)||0;
+  const dy=+(document.getElementById('rme-dy').value)||0;
+  const sx=+(document.getElementById('rme-sx').value)||1;
+  const sy=+(document.getElementById('rme-sy').value)||1;
+  window._rmEditNodes=_rmTransformPath(window._rmEditNodes,dx,dy,sx,sy);
+  const pd=_rmSerializePath(window._rmEditNodes);
+  _rmSyncPaths(pd);
+  document.getElementById('rme-dx').value=0;document.getElementById('rme-dy').value=0;
+  document.getElementById('rme-sx').value=1;document.getElementById('rme-sy').value=1;
+  _rmEditSetup();
+}
+function rmCopyPath(){
+  const out=document.getElementById('rmPathOut');if(!out)return;
+  navigator.clipboard.writeText(out.value).then(()=>{const b=document.getElementById('rmCopyBtn');if(b){b.textContent='✓ Copied!';setTimeout(()=>{b.textContent='Copy Path';},2000);}});
+}
+
 // ═══ JOURNEY ROADMAP ═══
 function pgRoadmap(accounts){
   const BT_R_MO=13.63, BT_WR=73.2, BT_PF=5.89;
@@ -1235,236 +1455,130 @@ function pgRoadmap(accounts){
   const fundedAccts=sorted.filter(a=>a.phase==="funded");
 
   // ── JOURNEY STEP DETECTION ──
+  // Path: 3× $50K challenges → 3 funded accounts → $50K withdrawn → $100K withdrawn → master → freedom
   const g=D.settings.goal;
   const totalPaid=(g.payouts||[]).reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
   let step=0;
-  if(accounts.length>0)step=1;
-  if(verifyAccts.length>0||fundedAccts.length>0)step=2;
-  if(fundedAccts.length>=1)step=3;
-  if(fundedAccts.length>=1&&(challengeAccts.length>0||verifyAccts.length>0))step=4;
-  if(fundedAccts.length>=2)step=5;
-  if(totalPaid>=50000)step=6;
-  if(totalPaid>=(g.target||100000))step=7;
+  if(accounts.length>0)step=1;                                                                    // CHALLENGE #1 started
+  if(verifyAccts.length>0||fundedAccts.length>0)step=2;                                           // VERIFICATION #1
+  if(fundedAccts.length>=1)step=3;                                                                // FUNDED #1
+  if(fundedAccts.length>=1&&(challengeAccts.length>0||verifyAccts.length>0))step=4;              // CHALLENGE #2 running
+  if(fundedAccts.length>=2)step=5;                                                                // FUNDED #2
+  if(fundedAccts.length>=2&&(challengeAccts.length>0||verifyAccts.length>0))step=6;              // CHALLENGE #3 running
+  if(fundedAccts.length>=3)step=7;                                                                // FUNDED #3
+  if(totalPaid>=50000)step=8;                                                                     // $50K withdrawn
+  if(totalPaid>=100000)step=9;                                                                    // $100K withdrawn
+  if(totalPaid>=100000&&fundedAccts.length>=3)step=10;                                           // Master trader
+  if(totalPaid>=200000)step=11;                                                                   // Freedom
 
+  // ── MILESTONE DATA — 12 steps ──
   const ms=[
-    {x:250,y:80, icon:"\u{1F9ED}",label:"START",       sub:"Begin Your Journey",     q:"Clarity before action. Know your edge.",qw:"The first step is always the hardest. You already have a proven system — 73.2% WR over 1,312 trades. Trust the process."},
-    {x:350,y:240,icon:"\u2694\uFE0F", label:"CHALLENGE",   sub:"Phase 1 · $5K",   q:"Calculated aggression at 1.5%. Trust the math.",qw:"Fear and greed are loudest here. Your backtest shows 91% pass rate. This isn't gambling — it's executing a proven edge."},
-    {x:150,y:400,icon:"\u{1F6E1}\uFE0F", label:"VERIFICATION",sub:"Phase 2 · $2.5K",        q:"Conservation mode. 1% risk. Patience wins.",qw:"Drop to 1%. No heroics. 100% pass rate in backtest. This is where patience separates professionals from amateurs."},
-    {x:350,y:560,icon:"\u{1F3C6}",label:"FUNDED",       sub:"$5,453/month",    q:"You proved it works. Now protect and earn.",qw:"First real income. The temptation to over-trade is real. Stick to 1-2 setups per day. The system generates enough R."},
-    {x:150,y:720,icon:"\u{1F680}",label:"SCALE UP",     sub:"#2 begins",    q:"Same signals, more accounts. No new learning.",qw:"Scaling is not about working harder — it's about duplicating what already works. Same screen, same signal, more accounts."},
-    {x:350,y:880,icon:"\u{1F4B0}",label:"FUNDED",       sub:"$10,906/mo",    q:"Mirror trading: +3 min = 2x income.",qw:"Two income streams from one analysis session. This is the power of systematic trading. Your time is now leveraged."},
-    {x:150,y:1040,icon:"\u{1F525}",label:"$50K",         sub:"Milestone!",     q:"Compound patience. Consistency creates wealth.",qw:"Half the mountain is climbed. Look back at how far you've come. The same discipline that got you here gets you to the summit."},
-    {x:250,y:1200,icon:"\u{1F451}",label:"$100K",        sub:"Mission Complete",       q:"The system works. You proved it.",qw:"From a $50K challenge to $100K profit. Not luck — 6 years of backtested edge, executed with discipline. You earned this."},
+    {icon:"🌅",label:"START",           sub:"Begin Your Journey",              progress:0,    q:"Clarity before action. Know your edge.",                  qw:"The first step is always the hardest. You already have a proven system — 73.2% WR over 1,312 trades. Trust the process.",                                        desc:"The first step into the world of professional trading. You have a backtested, rule-based edge. Trust the system and execute with discipline."},
+    {icon:"⚔️",label:"CHALLENGE #1",    sub:"Phase 1 · $50K · 10% target",     progress:0.08, q:"Calculated aggression at 1.5%. Trust the math.",           qw:"Fear and greed are loudest here. Your backtest shows 91% pass rate at 1.5% risk. This isn't gambling — it's executing a proven edge.",                          desc:"Prove your skills with real discipline. $5,000 profit target in 30 days at 1.5% risk. Backtest shows 91% pass rate. Execute the system, nothing more."},
+    {icon:"🛡️",label:"VERIFICATION #1", sub:"Phase 2 · $50K · 5% target",      progress:0.16, q:"Conservation mode. 1% risk. Patience wins.",               qw:"Drop to 1% risk. No heroics. 100% pass rate in backtest at this level. Patience is what separates professionals from amateurs.",                              desc:"Consistency is key. Drop to 1% risk and repeat your edge for $2,500 profit in 60 days. 100% pass rate in backtesting. Patience here pays forever."},
+    {icon:"🏅",label:"FUNDED #1",        sub:"$5,453/month · 80% split",        progress:0.27, q:"You proved it works. Now protect and earn.",               qw:"First real income. The temptation to over-trade is real. Stick to 1-2 setups per day. The system generates enough R without forcing trades.",                 desc:"Your first funded account. $5,453/month from 80% profit split on a $50K account. Protect this account — it is your golden goose. The machine has started."},
+    {icon:"⚔️",label:"CHALLENGE #2",    sub:"Launch while #1 earns",           progress:0.36, q:"Same signal. More accounts. Zero new learning.",           qw:"Scaling is not about working harder — it's about duplicating what already works. Same screen, same signal, same rules, more accounts.",                     desc:"Start Challenge #2 while Account #1 generates income. One analysis session, two income streams in progress. The machine begins to multiply itself."},
+    {icon:"💰",label:"FUNDED #2",        sub:"$10,906/month · 2 accounts",      progress:0.45, q:"Mirror trading: +3 minutes = 2× income.",                 qw:"Two income streams from one session. This is the compounding power of systematic trading. Your time is now leveraged across two accounts.",                 desc:"Two funded accounts running in parallel. $10,906/month from one daily trading session. This is systematic leverage — same work, double the income."},
+    {icon:"⚔️",label:"CHALLENGE #3",    sub:"3rd $50K · Triple up",            progress:0.54, q:"One more account. Same rules. Bigger machine.",            qw:"Three challenges, three funded accounts — this is the architecture of your trading business. The same edge that worked twice, works a third time.",          desc:"Launch the 3rd $50K challenge while two accounts earn. This is the final lever to accelerate your $100K withdrawal goal. Three-stream machine incoming."},
+    {icon:"🔱",label:"FUNDED #3",        sub:"$16,359/month · 3 accounts",      progress:0.63, q:"Three streams. One session. Maximum leverage.",           qw:"Three funded accounts, one analysis session. $16,359 per month from a proven, rule-based system. This is financial engineering, not gambling.",              desc:"Three funded accounts simultaneously. $16,359/month from a single daily session. With this income rate, $100K in total withdrawals is ~6 months away."},
+    {icon:"🔥",label:"$50K WITHDRAWN",   sub:"Halfway — $50K in the bank",      progress:0.72, q:"Compound patience. Consistency creates wealth.",           qw:"Half the mountain is climbed. Three funded accounts running, $50K already withdrawn. The same discipline that got you here gets you to the summit.",        desc:"$50,000 in total profit withdrawals banked. A major psychological milestone. Three accounts accelerating your path to the final $100K goal."},
+    {icon:"👑",label:"$100K GOAL",        sub:"Six Figures · Mission Complete",  progress:0.81, q:"The system works. You built something real.",              qw:"From a $50K challenge to $100K withdrawn. Not luck — 6 years of backtested edge, executed with discipline across three funded accounts. You earned this.",   desc:"$100,000 in total profit withdrawals. Six-figure milestone achieved through 3 funded accounts and systematic discipline. You are in the top 1% globally."},
+    {icon:"⭐",label:"MASTER TRADER",    sub:"Optimize · Scale · Legacy",       progress:0.90, q:"The journey never ends. Now you master the art.",          qw:"$100K withdrawn, three funded accounts, consistent income. Now the work shifts from earning to optimizing, scaling, and building a lasting legacy.",         desc:"You have mastered the OCC Phantom Edge system. Three funded accounts generating consistent income. Now: add a 4th account, refine entries, mentor others."},
+    {icon:"🏆",label:"FREEDOM",          sub:"Financial Independence · Achieved",progress:0.99, q:"The system earns. You live. Freedom is the goal.",        qw:"You built a trading business from zero to financial freedom. The OCC Phantom Edge paid for your life. Now protect what you built and give back.",           desc:"Financial independence through systematic prop firm trading. $200K+ withdrawn, multiple funded accounts, complete time freedom. The ultimate goal — achieved."},
   ];
+  window._rmMs=ms;
+  window._rmStep=step;
 
-  // ── SVG ATMOSPHERIC ZEN JOURNEY MAP ──
-  const W=500,H=1300;
-  const roadPath="M 250,80 C 250,130 350,190 350,240 C 350,320 150,320 150,400 C 150,480 350,480 350,560 C 350,640 150,640 150,720 C 150,800 350,800 350,880 C 350,960 150,960 150,1040 C 150,1120 250,1150 250,1200";
+  // ── JOURNEY MAP (background.png + SVG bezier path overlay, portrait 100×165 viewBox) ──
+  // Path rescaled from 0-100 square → 0-100 × 0-165 portrait (y_new = 10 + (y_old-18)*(145/79))
+  // Path y-coords = user-drawn coords + 32 (compensates for xMidYMid meet offset with old 100×220 viewBox vs new 100×284 that matches image 608×1727 aspect exactly)
+  const rmPath="M 35.81 244.10 C 9.23 242.12 8.23 222.28 12.20 220.32 C 15.58 204.62 91.57 210.77 90.58 186.19 C 88.19 176.27 63.19 182.42 37.40 157.22 C 25.69 153.06 12.20 154.05 13.19 146.71 C 16.77 133.19 43.95 138.57 67.96 125.08 C 71.33 115.56 56.25 119.33 43.95 112.18 C 42.96 100.65 74.90 95.62 67.56 88.18 C 62.00 85.10 58.50 82.00 58.43 79.74 C 58.50 71.00 81.65 78.06 75.89 70.22 C 78.00 64.20 46.00 68.30 48.71 59.01 C 52.28 52.46 71.13 58.02 66.96 49.49 C 60.81 46.71 55.85 44.13 47.12 44.92";
 
-  h+=`<div style="display:flex;justify-content:center;margin:0 -16px;overflow:visible">`;
-  h+=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;height:auto;display:block">`;
+  h+=`<style>
+@keyframes rmHalo{0%,100%{opacity:.4}50%{opacity:0}}
+@keyframes rmFloat{0%,100%{transform:translateY(0);opacity:.3}50%{transform:translateY(-6px);opacity:.55}}
+.rm-map-wrap{position:relative;margin:0 -16px 20px;overflow:hidden}
+.rm-glow-l{position:absolute;top:20%;left:10%;width:45%;padding-bottom:45%;border-radius:50%;background:rgba(168,85,247,.12);filter:blur(60px);pointer-events:none}
+.rm-glow-r{position:absolute;bottom:15%;right:10%;width:40%;padding-bottom:40%;border-radius:50%;background:rgba(16,185,129,.12);filter:blur(60px);pointer-events:none}
+.rm-bg-img{width:100%;height:auto;display:block;opacity:.88}
+.rm-fade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.15) 0%,transparent 20%,transparent 72%,rgba(0,0,0,.88) 100%);pointer-events:none}
+.rm-svg{position:absolute;top:0;left:0;width:100%;height:100%}
+</style>`;
+
+  h+=`<div class="rm-map-wrap">`;
+  h+=`<img class="rm-bg-img" src="trading-journey-roadmap/src/background.png" alt="" onerror="this.style.display='none'">`;
+  h+=`<div class="rm-glow-l"></div><div class="rm-glow-r"></div>`;
+  h+=`<div class="rm-fade"></div>`;
+  h+=`<svg class="rm-svg" viewBox="0 0 100 235">`;
 
   // ── DEFS ──
   h+=`<defs>`;
-  // Atmospheric gradient: warm peach/lavender → deep teal forest
-  h+=`<linearGradient id="atmoG" x1="0" y1="0" x2="0" y2="1">`;
-  h+=`<stop offset="0%" stop-color="#FFCCBC"/><stop offset="8%" stop-color="#E1BEE7"/>`;
-  h+=`<stop offset="20%" stop-color="#D1C4E9"/><stop offset="35%" stop-color="#9FA8DA"/>`;
-  h+=`<stop offset="50%" stop-color="#80CBC4"/><stop offset="65%" stop-color="#4DB6AC"/>`;
-  h+=`<stop offset="80%" stop-color="#2E7D32"/><stop offset="92%" stop-color="#1B5E20"/>`;
-  h+=`<stop offset="100%" stop-color="#004D40"/></linearGradient>`;
-  // Mountain gradients
-  h+=`<linearGradient id="mt1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#9575CD" stop-opacity="0.35"/><stop offset="100%" stop-color="#5E35B1" stop-opacity="0.15"/></linearGradient>`;
-  h+=`<linearGradient id="mt2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7986CB" stop-opacity="0.3"/><stop offset="100%" stop-color="#3949AB" stop-opacity="0.12"/></linearGradient>`;
-  h+=`<linearGradient id="mt3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4DB6AC" stop-opacity="0.22"/><stop offset="100%" stop-color="#00796B" stop-opacity="0.1"/></linearGradient>`;
-  // Frosted glass road
-  h+=`<linearGradient id="glassR" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="white" stop-opacity="0.25"/><stop offset="50%" stop-color="white" stop-opacity="0.14"/><stop offset="100%" stop-color="white" stop-opacity="0.2"/></linearGradient>`;
-  h+=`<linearGradient id="glassEdge" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="white" stop-opacity="0.4"/><stop offset="100%" stop-color="white" stop-opacity="0.1"/></linearGradient>`;
-  // Medal gradients
-  h+=`<linearGradient id="medalGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FFD54F"/><stop offset="50%" stop-color="#FFA000"/><stop offset="100%" stop-color="#FF8F00"/></linearGradient>`;
-  h+=`<linearGradient id="medalSilver" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#CFD8DC"/><stop offset="50%" stop-color="#90A4AE"/><stop offset="100%" stop-color="#607D8B"/></linearGradient>`;
-  h+=`<linearGradient id="medalTeal" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#80CBC4"/><stop offset="50%" stop-color="#26A69A"/><stop offset="100%" stop-color="#00897B"/></linearGradient>`;
-  h+=`<linearGradient id="medalDone" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#A5D6A7"/><stop offset="50%" stop-color="#66BB6A"/><stop offset="100%" stop-color="#388E3C"/></linearGradient>`;
-  // Glow filters
-  h+=`<filter id="halo"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-  h+=`<filter id="haloSm"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-  h+=`<filter id="haloLg"><feGaussianBlur stdDeviation="14" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  // Colorful path gradient: warm gold (bottom) → teal (mid) → bright cool (top)
+  h+=`<linearGradient id="rmColPath" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#FFAB40" stop-opacity="0.9"/><stop offset="45%" stop-color="#4DB6AC" stop-opacity="0.85"/><stop offset="100%" stop-color="#B0BEC5" stop-opacity="0.7"/></linearGradient>`;
+  // Subtle wide glow layer gradient
+  h+=`<linearGradient id="rmPathG" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" stop-color="#FFAB40" stop-opacity="0.18"/><stop offset="50%" stop-color="#4DB6AC" stop-opacity="0.12"/><stop offset="100%" stop-color="#B0BEC5" stop-opacity="0.06"/></linearGradient>`;
+  // Blur filter for milestone glow halos
+  h+=`<filter id="rmBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.8"/></filter>`;
+  h+=`<filter id="rmGlow"><feGaussianBlur stdDeviation="0.6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
   h+=`</defs>`;
 
-  // ── ATMOSPHERE BACKGROUND ──
-  h+=`<rect width="${W}" height="${H}" fill="url(#atmoG)" rx="20"/>`;
-
-  // Sun glow (top right)
-  h+=`<circle cx="420" cy="70" r="60" fill="#FFAB91" opacity="0.12" filter="url(#haloLg)"/>`;
-  h+=`<circle cx="420" cy="70" r="28" fill="#FFCC80" opacity="0.18"/>`;
-  h+=`<circle cx="420" cy="70" r="14" fill="#FFF8E1" opacity="0.3"/>`;
-
-  // Planet with ring (top left)
-  h+=`<g opacity="0.18"><circle cx="85" cy="90" r="24" fill="#CE93D8"/>`;
-  h+=`<circle cx="77" cy="82" r="20" fill="#BA68C8" opacity="0.5"/>`;
-  h+=`<ellipse cx="85" cy="90" rx="36" ry="5" fill="none" stroke="#CE93D8" stroke-width="1.2" opacity="0.5" transform="rotate(-20,85,90)"/></g>`;
-
-  // Stars (fade with altitude)
-  [[30,25],[70,12],[160,22],[200,38],[310,18],[370,32],[460,22],[480,42],[130,48],[400,52],[50,60],[240,10],[330,45],[175,56],[100,35],[450,15],[35,75],[320,65]].forEach(([sx,sy])=>{
-    const o=Math.max(0,(85-sy)/85)*0.45;
-    if(o>0.04)h+=`<circle cx="${sx}" cy="${sy}" r="${0.6+Math.random()*1.2}" fill="white" opacity="${o.toFixed(2)}"/>`;
-  });
-
-  // ── MOUNTAINS (3-layer low-poly) ──
-  h+=`<polygon points="0,${H} 0,220 60,120 120,200 170,100 220,170 280,130 340,195 400,115 460,185 ${W},210 ${W},${H}" fill="url(#mt1)"/>`;
-  // Snow caps
-  [[170,100],[400,115],[60,120],[280,130]].forEach(([px,py])=>{h+=`<polygon points="${px-7},${py+8} ${px},${py} ${px+7},${py+8}" fill="white" opacity="0.18"/>`});
-
-  h+=`<polygon points="0,${H} 0,380 45,310 100,365 155,280 210,345 270,295 340,355 400,310 460,360 ${W},380 ${W},${H}" fill="url(#mt2)"/>`;
-
-  h+=`<polygon points="0,${H} 0,700 35,650 90,690 145,620 200,670 260,640 330,680 400,645 460,685 ${W},700 ${W},${H}" fill="url(#mt3)"/>`;
-
-  // ── PINE TREES (3-tier, layered depth) ──
-  const tree=(tx,ty,s,c1,c2,op)=>{
-    let t='';
-    t+=`<polygon points="${tx},${ty} ${tx-s*0.6},${ty+s*1.2} ${tx+s*0.6},${ty+s*1.2}" fill="${c1}" opacity="${op}"/>`;
-    t+=`<polygon points="${tx},${ty+s*0.5} ${tx-s*0.8},${ty+s*1.6} ${tx+s*0.8},${ty+s*1.6}" fill="${c2}" opacity="${op*0.9}"/>`;
-    t+=`<polygon points="${tx},${ty+s*1.0} ${tx-s*0.95},${ty+s*2.0} ${tx+s*0.95},${ty+s*2.0}" fill="${c1}" opacity="${op*0.85}"/>`;
-    t+=`<rect x="${tx-1.5}" y="${ty+s*2}" width="3" height="${s*0.5}" fill="#4E342E" opacity="${op*0.4}"/>`;
-    return t;
-  };
-  // Distant (purple haze)
-  [[18,360,7],[478,340,8],[35,390,6],[465,380,7]].forEach(([x,y,s])=>{h+=tree(x,y,s,'#4A148C','#311B92',0.25)});
-  // Mid (green-teal)
-  [[14,560,11],[484,540,10],[28,680,12],[475,660,11],[10,810,13],[490,790,12]].forEach(([x,y,s])=>{h+=tree(x,y,s,'#1B5E20','#2E7D32',0.4)});
-  // Near (deep forest)
-  [[16,930,14],[482,910,13],[30,1060,13],[472,1040,12],[12,1150,11],[485,1130,10],[25,1220,10],[475,1200,9]].forEach(([x,y,s])=>{h+=tree(x,y,s,'#003D33','#004D40',0.5)});
-
-  // ── DATA TREES (glowing digital nature) ──
-  const dataTree=(dx,dy,s,op)=>{
-    let t='';
-    t+=`<line x1="${dx}" y1="${dy}" x2="${dx}" y2="${dy+s*2.5}" stroke="#80CBC4" stroke-width="1.5" opacity="${op*0.35}"/>`;
-    [[-.8,0.4],[.7,0.7],[-.6,1.2],[.9,1.4],[-.5,1.8],[.6,2.1]].forEach(([bx,by])=>{
-      const ex=dx+bx*s*0.8, ey=dy+by*s;
-      t+=`<line x1="${dx}" y1="${ey}" x2="${ex}" y2="${ey-s*0.12}" stroke="#80CBC4" stroke-width="0.7" opacity="${op*0.25}"/>`;
-      t+=`<circle cx="${ex}" cy="${ey-s*0.12}" r="2.5" fill="#80CBC4" opacity="${op*0.4}"/>`;
-    });
-    t+=`<circle cx="${dx}" cy="${dy}" r="${s*0.5}" fill="#80CBC4" opacity="${op*0.06}" filter="url(#haloSm)"/>`;
-    return t;
-  };
-  h+=dataTree(470,600,14,0.6);
-  h+=dataTree(30,780,12,0.5);
-  h+=dataTree(480,950,13,0.5);
-
-  // ── CANDLESTICK CHARTS (subtle bg) ──
-  const miniChart=(cx,cy,op)=>{
-    let t=`<g opacity="${op}">`;
-    [[0,14],[7,10],[14,16],[21,8],[28,12],[35,6]].forEach(([bx,bh],j)=>{
-      const g=j%2===0;
-      t+=`<rect x="${cx+bx}" y="${cy-bh}" width="4" height="${bh}" rx="1" fill="${g?'#80CBC4':'#EF9A9A'}" opacity="0.25"/>`;
-      t+=`<line x1="${cx+bx+2}" y1="${cy-bh-4}" x2="${cx+bx+2}" y2="${cy+3}" stroke="${g?'#80CBC4':'#EF9A9A'}" stroke-width="0.6" opacity="0.15"/>`;
-    });
-    t+=`</g>`;return t;
-  };
-  h+=miniChart(430,490,0.2);
-  h+=miniChart(25,620,0.18);
-  h+=miniChart(440,780,0.18);
-
-  // ── CLOUDS ──
-  const cloud=(cx,cy,s,op)=>{
-    let c='';
-    c+=`<ellipse cx="${cx}" cy="${cy}" rx="${s*2.2}" ry="${s*0.65}" fill="white" opacity="${op}"/>`;
-    c+=`<ellipse cx="${cx+s}" cy="${cy-s*0.3}" rx="${s*1.4}" ry="${s*0.5}" fill="white" opacity="${op*0.9}"/>`;
-    c+=`<ellipse cx="${cx-s*0.7}" cy="${cy-s*0.2}" rx="${s*1.2}" ry="${s*0.45}" fill="white" opacity="${op*0.85}"/>`;
-    return c;
-  };
-  h+=cloud(80,145,15,0.12);
-  h+=cloud(380,175,13,0.08);
-  h+=cloud(230,210,11,0.06);
-
-  // ── FROSTED GLASS ROAD ──
-  // Outer ambient glow
-  h+=`<path d="${roadPath}" fill="none" stroke="white" stroke-width="72" stroke-linecap="round" opacity="0.035" filter="url(#haloLg)"/>`;
-  // Frost body
-  h+=`<path d="${roadPath}" fill="none" stroke="white" stroke-width="62" stroke-linecap="round" opacity="0.055"/>`;
-  // Glass surface
-  h+=`<path d="${roadPath}" fill="none" stroke="url(#glassR)" stroke-width="58" stroke-linecap="round"/>`;
-  // Edge highlight
-  h+=`<path d="${roadPath}" fill="none" stroke="url(#glassEdge)" stroke-width="56" stroke-linecap="round" opacity="0.12"/>`;
-  // Inner glow
-  h+=`<path d="${roadPath}" fill="none" stroke="white" stroke-width="34" stroke-linecap="round" opacity="0.025"/>`;
-  // Center dashed line
-  h+=`<path d="${roadPath}" fill="none" stroke="white" stroke-width="1.5" stroke-dasharray="16,20" opacity="0.28"/>`;
-
-  // ── ANIMATIONS ──
-  h+=`<style>@keyframes jHalo{0%,100%{opacity:.35}50%{opacity:0}}.jHalo{animation:jHalo 2.5s ease-in-out infinite}@keyframes jPulse{0%,100%{r:28}50%{r:33}}.jPulse{animation:jPulse 2.5s ease-in-out infinite}</style>`;
-
-  // ── MILESTONE MEDALS ──
-  const medalColors=['medalTeal','medalTeal','medalSilver','medalGold','medalTeal','medalGold','medalGold','medalGold'];
-  ms.forEach((m,i)=>{
-    const isDone=i<step;
-    const isCur=i===step&&step<8;
-    const isFut=i>step;
-
-    // Halo ring for current
-    if(isCur){
-      h+=`<circle cx="${m.x}" cy="${m.y}" r="34" fill="none" stroke="#FFCC80" stroke-width="2" class="jHalo"/>`;
-      h+=`<circle cx="${m.x}" cy="${m.y}" r="30" fill="#FFCC80" opacity="0.05" filter="url(#halo)"/>`;
-    }
-    // Done halo
-    if(isDone)h+=`<circle cx="${m.x}" cy="${m.y}" r="28" fill="#A5D6A7" opacity="0.08" filter="url(#haloSm)"/>`;
-
-    // Outer ring (metallic)
-    const grad=isDone?'medalDone':isCur?'medalGold':(isFut?'medalSilver':medalColors[i]);
-    h+=`<circle cx="${m.x}" cy="${m.y}" r="26" fill="none" stroke="url(#${grad})" stroke-width="3" opacity="${isFut?0.2:1}"/>`;
-    // Inner glass fill
-    const innerFill=isDone?'rgba(46,125,50,0.25)':isCur?'rgba(255,183,77,0.12)':'rgba(255,255,255,0.05)';
-    h+=`<circle cx="${m.x}" cy="${m.y}" r="24" fill="${innerFill}" stroke="rgba(255,255,255,${isFut?0.08:0.3})" stroke-width="0.8"/>`;
-    // Metallic shine arc
-    if(!isFut)h+=`<path d="M ${m.x-15},${m.y-18} A 24,24 0 0,1 ${m.x+15},${m.y-18}" fill="none" stroke="white" stroke-width="1" opacity="0.2"/>`;
-
-    // Icon
-    h+=`<text x="${m.x}" y="${m.y+8}" text-anchor="middle" font-size="22" style="pointer-events:none" opacity="${isFut?0.3:1}">${m.icon}</text>`;
-
-    // Checkmark badge
-    if(isDone){
-      h+=`<circle cx="${m.x+18}" cy="${m.y-18}" r="9" fill="url(#medalDone)" stroke="white" stroke-width="1.5"/>`;
-      h+=`<text x="${m.x+18}" y="${m.y-14}" text-anchor="middle" font-size="10" fill="white" font-weight="700">\u2713</text>`;
-    }
-
-    // ── LABELS — positioned INSIDE the curve (toward center) ──
-    const isRight=m.x>250;
-    const centered=i===0||i===7;
-    // For right-side milestones: label goes LEFT (toward center)
-    // For left-side milestones: label goes RIGHT (toward center)
-    const lx=centered?m.x:(isRight?m.x-38:m.x+38);
-    const anc=centered?"middle":(isRight?"end":"start");
-    const labelY=centered?(i===0?m.y-38:m.y+46):m.y-7;
-    const subY=centered?(i===0?m.y-23:m.y+61):m.y+10;
-    const labelOp=isFut?0.28:0.95;
-    const subOp=isFut?0.18:0.55;
-
-    h+=`<text x="${lx}" y="${labelY}" text-anchor="${anc}" font-size="13" font-weight="600" fill="white" opacity="${labelOp}" font-family="Inter,'Segoe UI',system-ui,sans-serif" letter-spacing="0.5">${m.label}</text>`;
-    h+=`<text x="${lx}" y="${subY}" text-anchor="${anc}" font-size="10.5" fill="white" opacity="${subOp}" font-family="Inter,'Segoe UI',system-ui,sans-serif" font-weight="300">${m.sub}</text>`;
-  });
-
-  // "YOU ARE HERE"
-  if(step<8){
-    const cur=ms[step];
-    h+=`<text x="${cur.x}" y="${cur.y+38}" text-anchor="middle" font-size="8" fill="#FFCC80" opacity="0.8" font-family="Inter,'Segoe UI',system-ui,sans-serif" letter-spacing="3" font-weight="600">YOU ARE HERE</text>`;
-  }
-
-  // Golden sparkles at $100K
-  h+=`<g filter="url(#halo)" opacity="${step>=7?0.85:0.1}">`;
-  [[230,1170],[270,1170],[215,1185],[285,1185],[225,1200],[275,1200],[250,1165]].forEach(([sx,sy])=>{
-    h+=`<circle cx="${sx}" cy="${sy}" r="2.5" fill="#FFD54F" opacity="0.7"/>`;
-    h+=`<line x1="${sx-4}" y1="${sy}" x2="${sx+4}" y2="${sy}" stroke="#FFD54F" stroke-width="0.8" opacity="0.4"/>`;
-    h+=`<line x1="${sx}" y1="${sy-4}" x2="${sx}" y2="${sy+4}" stroke="#FFD54F" stroke-width="0.8" opacity="0.4"/>`;
-  });
-  h+=`</g>`;
+  // ── PATH LAYERS (bottom to top: wide glow → colored road → dashed center line) ──
+  h+=`<path d="${rmPath}" fill="none" stroke="url(#rmPathG)" stroke-width="7" stroke-linecap="round"/>`;
+  h+=`<path d="${rmPath}" fill="none" stroke="url(#rmColPath)" stroke-width="2.2" stroke-linecap="round"/>`;
+  h+=`<path id="rmPath" d="${rmPath}" fill="none" stroke="rgba(255,255,255,0.55)" stroke-width="0.55" stroke-dasharray="2.5 4.5" stroke-linecap="round"/>`;
 
   // Title
-  h+=`<text x="250" y="28" text-anchor="middle" font-size="14" fill="white" opacity="0.65" font-family="Inter,'Segoe UI',system-ui,sans-serif" font-weight="300" letter-spacing="4.5" font-style="italic">Trading Journey</text>`;
+  h+=`<text x="50" y="8.5" text-anchor="middle" font-size="3.2" fill="white" opacity="0.5" font-family="Georgia,serif" font-style="italic" letter-spacing="0.8">Trading Journey</text>`;
+
+  // Milestone markers filled by _rmSetup() after DOM injection
+  h+=`<g id="rmMarkers"></g>`;
 
   h+=`</svg></div>`;
 
+  // ── MODAL OVERLAY (initially hidden) ──
+  h+=`<div id="rmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)" onclick="if(event.target===this)rmClose()">`;
+  h+=`<div style="width:100%;max-width:360px;background:var(--bg);border:1px solid var(--line);padding:28px;position:relative;max-height:82vh;overflow-y:auto">`;
+  h+=`<button onclick="rmClose()" style="position:absolute;top:12px;right:14px;background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;padding:4px 8px">✕</button>`;
+  h+=`<div id="rmModalContent"></div>`;
+  h+=`</div></div>`;
+
+  // ── PATH EDITOR PANEL ──
+  const editOn=!!window._rmEditMode;
+  h+=`<div style="margin:0 0 12px;display:flex;justify-content:flex-end">`;
+  h+=`<button onclick="rmToggleEdit()" style="font-size:11px;font-family:'JetBrains Mono',monospace;letter-spacing:1px;padding:6px 14px;border:1px solid ${editOn?'#fbbf24':'var(--line)'};background:${editOn?'rgba(251,191,36,0.12)':'transparent'};color:${editOn?'#fbbf24':'var(--muted)'};cursor:pointer">${editOn?'✕ EXIT EDITOR':'✏ ADJUST ROAD'}</button>`;
+  h+=`</div>`;
+  if(editOn){
+    h+=`<div style="border:1px solid #fbbf24;padding:16px;margin-bottom:16px;background:rgba(251,191,36,0.04)">`;
+    h+=`<div style="font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:2px;color:#fbbf24;margin-bottom:14px">ROAD LINE EDITOR</div>`;
+    // Translate
+    h+=`<div style="margin-bottom:12px">`;
+    h+=`<div style="font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:1px">TRANSLATE (nudge path)</div>`;
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">`;
+    h+=`<div><label style="font-size:9px;color:var(--sub);letter-spacing:1px">X OFFSET</label><input id="rme-dx" type="number" value="0" step="1" style="width:100%;padding:6px 8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;margin-top:3px"></div>`;
+    h+=`<div><label style="font-size:9px;color:var(--sub);letter-spacing:1px">Y OFFSET</label><input id="rme-dy" type="number" value="0" step="1" style="width:100%;padding:6px 8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;margin-top:3px"></div>`;
+    h+=`</div>`;
+    // Scale
+    h+=`<div style="font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:1px;margin-top:10px">SCALE (around center)</div>`;
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">`;
+    h+=`<div><label style="font-size:9px;color:var(--sub);letter-spacing:1px">SCALE X</label><input id="rme-sx" type="number" value="1" step="0.05" style="width:100%;padding:6px 8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;margin-top:3px"></div>`;
+    h+=`<div><label style="font-size:9px;color:var(--sub);letter-spacing:1px">SCALE Y</label><input id="rme-sy" type="number" value="1" step="0.05" style="width:100%;padding:6px 8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:12px;margin-top:3px"></div>`;
+    h+=`</div>`;
+    h+=`<button onclick="rmApplyTransform()" style="width:100%;padding:8px;border:1px solid #fbbf24;background:rgba(251,191,36,0.15);color:#fbbf24;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1.5px;cursor:pointer;margin-top:4px">APPLY TRANSFORM</button>`;
+    h+=`</div>`;
+    // Drag hint
+    h+=`<div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6;padding:8px;border:1px solid var(--line3)">`;
+    h+=`<span style="color:#fbbf24">●</span> Yellow = anchor points &nbsp; <span style="color:#a78bfa">●</span> Purple = curve handles<br>Drag directly on the map to reposition. Apply transform for bulk moves.`;
+    h+=`</div>`;
+    // Path output + copy
+    h+=`<div style="font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:1px">CURRENT PATH (copy to save permanently)</div>`;
+    const curPath=document.getElementById?'':(_rmSerializePath?_rmSerializePath(window._rmEditNodes||[]):'');
+    h+=`<textarea id="rmPathOut" rows="4" readonly style="width:100%;padding:8px;border:1px solid var(--line);background:var(--faint);color:var(--sub);font-family:'JetBrains Mono',monospace;font-size:9px;resize:vertical;box-sizing:border-box;line-height:1.5"></textarea>`;
+    h+=`<button id="rmCopyBtn" onclick="rmCopyPath()" style="width:100%;padding:7px;border:1px solid var(--line);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;cursor:pointer;margin-top:6px">Copy Path</button>`;
+    h+=`</div>`;
+  }
+
   // ── MINDSET CHECKPOINT ──
-  const curMs=ms[Math.min(step,7)];
+  const curMs=ms[Math.min(step,ms.length-1)];
   h+=`<div style="border:1px solid rgba(255,255,255,0.08);padding:24px;margin:12px 0 20px;background:linear-gradient(135deg,rgba(255,255,255,0.03),rgba(255,255,255,0.008));backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)">`;
   h+=`<div style="font-size:32px;text-align:center;margin-bottom:8px">${curMs.icon}</div>`;
   h+=`<div style="font-size:15px;font-weight:600;text-align:center;margin-bottom:8px;letter-spacing:1px;font-family:Inter,'Segoe UI',system-ui,sans-serif">${curMs.label}</div>`;
@@ -1610,9 +1724,9 @@ function pgRoadmap(accounts){
   h+=`<hr class="sr dk"><div class="slbl">Mindset Checkpoints</div>`;
   ms.forEach((m,i)=>{
     const isDone=i<step;
-    const isCur=i===step&&step<8;
+    const isCur=i===step&&step<ms.length;
     const isFut=i>step;
-    h+=`<div style="display:flex;gap:14px;padding:14px 16px;margin-bottom:8px;border:1px solid ${isDone?"var(--line)":isCur?"var(--line)":"var(--line3)"};${isFut?"opacity:0.4":""}${isCur?"border-left:3px solid #FF9800":""}">`;
+    h+=`<div style="display:flex;gap:14px;padding:14px 16px;margin-bottom:8px;border:1px solid ${isDone?"var(--line)":isCur?"var(--line)":"var(--line3)"};${isFut?"opacity:0.4":""}${isCur?";border-left:3px solid #FF9800":""};cursor:pointer" onclick="rmModal(${i})">`;
     h+=`<div style="font-size:22px;min-width:32px;text-align:center;padding-top:2px">${m.icon}</div>`;
     h+=`<div style="flex:1"><div style="font-size:12px;font-weight:700;margin-bottom:2px">${m.label} <span style="font-weight:400;color:var(--muted);font-size:10px">${m.sub}</span></div>`;
     h+=`<div style="font-size:11px;color:var(--muted);line-height:1.5;font-style:italic">"${m.q}"</div></div>`;
@@ -1651,10 +1765,10 @@ function pgRoadmap(accounts){
 // ═══ SETUP ═══
 function setFtmo(k,v){D.settings.ftmo[k]=v;save();R()}
 function ftmoPreset(ph){D.settings.ftmo.phase=ph;if(ph==="challenge"){D.settings.ftmo.profitTarget=10}else if(ph==="verification"){D.settings.ftmo.profitTarget=5}else{D.settings.ftmo.profitTarget=0}save();R()}
-function addFtmoAcct(){const n=D.settings.ftmoAccounts.length+1;D.settings.ftmoAccounts.push({...defAccount(),id:"acct_"+uid(),name:"Account #"+n});save();R()}
-function rmFtmoAcct(id){if(!confirm("Remove this account?"))return;D.settings.ftmoAccounts=D.settings.ftmoAccounts.filter(a=>a.id!==id);save();R()}
-function setAcct(id,k,v){const a=D.settings.ftmoAccounts.find(x=>x.id===id);if(a){a[k]=v;save();R()}}
-function acctPreset(id,ph){const a=D.settings.ftmoAccounts.find(x=>x.id===id);if(!a)return;a.phase=ph;if(ph==="challenge"){a.profitTarget=10;a.riskPct=1.5;a.daysAllowed=30}else if(ph==="verification"){a.profitTarget=5;a.riskPct=1.0;a.daysAllowed=60}else{a.profitTarget=0;a.riskPct=1.0;a.daysAllowed=0;a.profitSplit=80}save();R()}
+function addFtmoAcct(){const n=D.settings.ftmoAccounts.length+1;D.settings.ftmoAccounts.push({...defAccount(),id:"acct_"+uid(),name:"Account #"+n});save();if(D.settings.gdSync&&D.settings.gdCid)gPush(true);R()}
+function rmFtmoAcct(id){if(!confirm("Remove this account?"))return;D.settings.ftmoAccounts=D.settings.ftmoAccounts.filter(a=>a.id!==id);save();if(D.settings.gdSync&&D.settings.gdCid)gPush(true);R()}
+function setAcct(id,k,v){const a=D.settings.ftmoAccounts.find(x=>x.id===id);if(a){a[k]=v;save();if(D.settings.gdSync&&D.settings.gdCid)gPush(true);R()}}
+function acctPreset(id,ph){const a=D.settings.ftmoAccounts.find(x=>x.id===id);if(!a)return;a.phase=ph;if(ph==="challenge"){a.profitTarget=10;a.riskPct=1.5;a.daysAllowed=30}else if(ph==="verification"){a.profitTarget=5;a.riskPct=1.0;a.daysAllowed=60}else{a.profitTarget=0;a.riskPct=1.0;a.daysAllowed=0;a.profitSplit=80}save();if(D.settings.gdSync&&D.settings.gdCid)gPush(true);R()}
 function pgSetup(){let h=`<div class="hl">Setup</div>`;
   h+=`<hr class="sr dk"><div class="slbl">Parameters</div><div class="fg"><div><label class="fl">Risk %</label><input type="number" class="fi" value="${D.settings.risk}" min="0.1" max="5" step="0.1" onchange="D.settings.risk=parseFloat(this.value)||1;save()"></div><div><label class="fl">Min R:R</label><input type="number" class="fi" value="${D.settings.rr}" min="1" max="10" step="0.5" onchange="D.settings.rr=parseFloat(this.value)||2;save()"></div></div><div style="margin-top:16px;font-size:13px;color:var(--sub)">London 15:30–23:00 · NY 20:30 DST / 21:30 Std · UTC+7</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${PAIRS.map(p=>`<span style="font-family:'JetBrains Mono',monospace;font-size:11px;padding:4px 10px;border:1px solid var(--line2);border-radius:100px">${p}</span>`).join("")}</div>`;
 
